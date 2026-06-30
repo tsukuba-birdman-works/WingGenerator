@@ -466,31 +466,34 @@ class SpindleCAMEngine:
 
         # --- Prepare Exclusion Zones for Outer Tabs ---
         exclusion_zones_x = []
-        # 1. LE / TE (First and last 30mm of rib)
+        excl_le_te = float(params.get('tab_exclusion_le_te', '30.0'))
+        excl_str = float(params.get('tab_exclusion_stringer', '10.0'))
+
+        # 1. LE / TE (First and last excl_le_te mm of rib)
         rib_min_x, rib_max_x = 0.0, 0.0
         if poly_rib and poly_rib.is_valid:
             bounds = poly_rib.bounds
             rib_min_x, rib_max_x = bounds[0], bounds[2]
-            exclusion_zones_x.append((rib_min_x - 1000.0, rib_min_x + 30.0))
-            exclusion_zones_x.append((rib_max_x - 30.0, rib_max_x + 1000.0))
+            exclusion_zones_x.append((rib_min_x - 1000.0, rib_min_x + excl_le_te))
+            exclusion_zones_x.append((rib_max_x - excl_le_te, rib_max_x + 1000.0))
             
-        # 2. Stringers (±10mm)
+        # 2. Stringers (±excl_str mm)
         if hasattr(rib_res, 'stringer_pts_list') and rib_res.stringer_pts_list:
             for st_pts in rib_res.stringer_pts_list:
                 s_pts = [(float(pt[0] - origin_pt[0]), float(pt[1] - origin_pt[1])) for pt in st_pts]
                 if s_pts:
                     min_sx = min(p[0] for p in s_pts)
                     max_sx = max(p[0] for p in s_pts)
-                    exclusion_zones_x.append((min_sx - 10.0, max_sx + 10.0))
+                    exclusion_zones_x.append((min_sx - excl_str, max_sx + excl_str))
                     
-        # 3. Plank Steps (±10mm)
+        # 3. Plank Steps (±excl_str mm)
         if hasattr(rib_res, 'plank_poly_rot'):
             p_arr = rib_res.plank_poly_rot
             if len(p_arr) > 0:
                 p_min_x = min(p[0] for p in p_arr) - origin_pt[0]
                 p_max_x = max(p[0] for p in p_arr) - origin_pt[0]
-                exclusion_zones_x.append((p_min_x - 10.0, p_min_x + 10.0))
-                exclusion_zones_x.append((p_max_x - 10.0, p_max_x + 10.0))
+                exclusion_zones_x.append((p_min_x - excl_str, p_min_x + excl_str))
+                exclusion_zones_x.append((p_max_x - excl_str, p_max_x + excl_str))
 
         # Inner toolpaths first, then outer toolpath
         all_toolpaths = inner_toolpaths + outer_toolpaths
