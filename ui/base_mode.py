@@ -98,6 +98,8 @@ class BaseRibGeneratorGUI:
         self.outer_tab_width = tk.StringVar(value="6.0")
         self.outer_tab_interval = tk.StringVar(value="100.0")
         self.tab_angle_deg = tk.StringVar(value="45.0")
+        self.tab_exclusion_stringer = tk.StringVar(value="10.0")
+        self.tab_exclusion_le_te = tk.StringVar(value="30.0")
         self.main_spar_support_w = tk.StringVar(value="2.0")
         self.main_spar_support_h = tk.StringVar(value="5.0")
         self.main_spar_support_thick = tk.StringVar(value="2.0")
@@ -120,6 +122,8 @@ class BaseRibGeneratorGUI:
             'outer_tab_width': getattr(self, 'outer_tab_width', self.truss_tab_width),
             'outer_tab_interval': getattr(self, 'outer_tab_interval', tk.StringVar(value="100.0")),
             'tab_angle_deg': getattr(self, 'tab_angle_deg', tk.StringVar(value="45.0")),
+            'tab_exclusion_stringer': getattr(self, 'tab_exclusion_stringer', tk.StringVar(value="10.0")),
+            'tab_exclusion_le_te': getattr(self, 'tab_exclusion_le_te', tk.StringVar(value="30.0")),
             'main_spar_support_w': self.main_spar_support_w,
             'main_spar_support_h': self.main_spar_support_h,
             'main_spar_support_thick': self.main_spar_support_thick,
@@ -187,6 +191,12 @@ class BaseRibGeneratorGUI:
         
         tk.Label(lf_truss, text="Tab Z Angle (deg):").grid(row=4, column=0, sticky="e", padx=5, pady=2)
         tk.Entry(lf_truss, textvariable=self.tab_angle_deg, width=8).grid(row=4, column=1, sticky="w", padx=5, pady=2)
+
+        tk.Label(lf_truss, text="Exclusion (Stringer, mm):").grid(row=5, column=0, sticky="e", padx=5, pady=2)
+        tk.Entry(lf_truss, textvariable=self.tab_exclusion_stringer, width=8).grid(row=5, column=1, sticky="w", padx=5, pady=2)
+
+        tk.Label(lf_truss, text="Exclusion (LE/TE, mm):").grid(row=6, column=0, sticky="e", padx=5, pady=2)
+        tk.Entry(lf_truss, textvariable=self.tab_exclusion_le_te, width=8).grid(row=6, column=1, sticky="w", padx=5, pady=2)
         
         lf_main = tk.LabelFrame(left_panel, text="Main Spar E-Support")
         lf_main.pack(fill=tk.X, pady=5)
