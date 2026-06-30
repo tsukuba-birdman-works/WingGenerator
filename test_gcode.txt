@@ -1,0 +1,3 @@
+Warnings: []
+Gcode length: 41222 lines
+Has bridge pocket? True
