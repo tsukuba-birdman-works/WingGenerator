@@ -34,30 +34,28 @@ class SpindleCAMEngine:
         target_z = cut_z
         
         for tx, ty in tab_centers:
+            # For outer path, tab_centers contains the explicitly generated outer tabs
+            # For inner path, tab_centers contains the truss hole tabs
             dist = (x - tx)**2 + (y - ty)**2
             dist = dist ** 0.5
             w_half = tab_width / 2.0
             
-            if dist <= w_half:
-                # Flat top of the tab (the uncut material left)
-                candidate_z = tab_z
-                target_z = max(target_z, candidate_z)
-            else:
-                # Ramp down towards cut_z
+            if dist < w_half:
                 import math
                 angle_rad = math.radians(tab_angle_deg)
                 if angle_rad <= 0:
                     angle_rad = math.radians(90.0)
-                    
-                # Z decreases (goes deeper) as dist increases beyond w_half
-                ramp_distance = dist - w_half
-                ramp_z = tab_z - (ramp_distance * math.tan(angle_rad))
                 
-                # The Z cannot go deeper than cut_z
-                candidate_z = max(cut_z, ramp_z)
+                # Ramp starts from the bottom (cut_z) at dist == w_half
+                # and goes UP as dist approaches 0.
+                ramp_distance = w_half - dist
+                ramp_z = cut_z + (ramp_distance * math.tan(angle_rad))
+                
+                # Cap the height at tab_z (flat top)
+                candidate_z = min(ramp_z, tab_z)
                 target_z = max(target_z, candidate_z)
                 
-        return min(target_z, tab_z) # Cap at tab_z (safety)
+        return target_z
 
     def generate_gcode(self, rib_res, params: Dict[str, Any]) -> Tuple[str, List[str]]:
         """
