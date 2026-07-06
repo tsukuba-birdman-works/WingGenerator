@@ -72,6 +72,7 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             act_var = getattr(self, f'js{i}_act', tk.BooleanVar(value=False))
             if act_var.get():
                 joint_sleeves.append({
+                    'type': getattr(self, f'js{i}_type', tk.StringVar(value='Foam+Cap')).get(),
                     'start': self.safe_float(getattr(self, f'js{i}_start')),
                     'end': self.safe_float(getattr(self, f'js{i}_end')),
                     'out_dia': self.safe_float(getattr(self, f'js{i}_out_dia')),

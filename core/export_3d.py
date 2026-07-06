@@ -458,23 +458,31 @@ class Wing3DBuilder:
                     print("Error creating joint sleeve part:", e)
                     return None
 
-            # 1. Skin (Outer cylinder)
-            skin_mesh = place_annulus(R_out - t2, R_out, L, (y_start + y_end) / 2.0)
-            if skin_mesh: meshes[f"JointSleeve_Skin_{i}"] = skin_mesh
+            js_type = js.get('type', 'Foam+Cap')
+            
+            if js_type == 'Carbon Cylinder':
+                # Type 2: Just carbon cloth, inner = R_in, outer = R_out
+                skin_mesh = place_annulus(R_in, R_out, L, (y_start + y_end) / 2.0)
+                if skin_mesh: meshes[f"JointSleeve_Skin_{i}"] = skin_mesh
+            else:
+                # Type 1: Foam + Caps
+                # 1. Skin (Outer cylinder)
+                skin_mesh = place_annulus(R_out - t2, R_out, L, (y_start + y_end) / 2.0)
+                if skin_mesh: meshes[f"JointSleeve_Skin_{i}"] = skin_mesh
 
-            # 2. Caps (CFRP Plates)
-            if t1 > 0:
-                cap_s = place_annulus(R_in, R_out, t1, y_start + t1 / 2.0)
-                if cap_s: meshes[f"JointSleeve_CapS_{i}"] = cap_s
-                
-                cap_e = place_annulus(R_in, R_out, t1, y_end - t1 / 2.0)
-                if cap_e: meshes[f"JointSleeve_CapE_{i}"] = cap_e
+                # 2. Caps (CFRP Plates)
+                if t1 > 0:
+                    cap_s = place_annulus(R_in, R_out, t1, y_start + t1 / 2.0)
+                    if cap_s: meshes[f"JointSleeve_CapS_{i}"] = cap_s
+                    
+                    cap_e = place_annulus(R_in, R_out, t1, y_end - t1 / 2.0)
+                    if cap_e: meshes[f"JointSleeve_CapE_{i}"] = cap_e
 
-            # 3. Foam (Core)
-            foam_L = L - 2 * t1
-            if foam_L > 0 and R_out - t2 > R_in:
-                foam_mesh = place_annulus(R_in, R_out - t2, foam_L, (y_start + y_end) / 2.0)
-                if foam_mesh: meshes[f"JointSleeve_Foam_{i}"] = foam_mesh
+                # 3. Foam (Core)
+                foam_L = L - 2 * t1
+                if foam_L > 0 and R_out - t2 > R_in:
+                    foam_mesh = place_annulus(R_in, R_out - t2, foam_L, (y_start + y_end) / 2.0)
+                    if foam_mesh: meshes[f"JointSleeve_Foam_{i}"] = foam_mesh
 
     def _to_rel(self, pts, c_m):
         return np.array(pts) - c_m if pts is not None and len(pts) > 0 else []
