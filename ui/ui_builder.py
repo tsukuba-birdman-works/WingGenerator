@@ -142,7 +142,8 @@ class UIBuilder:
                 ttk.Entry(parent_frame, textvariable=var, width=10).grid(row=r, column=c+1, sticky=tk.W, padx=5, pady=2)
                 c += 2
             elif wtype == 'combobox':
-                opts = ['Styrofoam (Blue)', 'Carbon (Black)', 'Wood (Brown)', 'Kevlar (Yellow)', 'OPP Film (Clear)', 'Metal (Silver)']
+                default_opts = ['Styrofoam (Blue)', 'Carbon (Black)', 'Wood (Brown)', 'Kevlar (Yellow)', 'OPP Film (Clear)', 'Metal (Silver)']
+                opts = p.get('values', default_opts)
                 ttk.Label(parent_frame, text=label).grid(row=r, column=c, sticky=tk.E, padx=5, pady=2)
                 ttk.Combobox(parent_frame, textvariable=var, values=opts, width=15).grid(row=r, column=c+1, sticky=tk.W, padx=5, pady=2)
                 c += 2

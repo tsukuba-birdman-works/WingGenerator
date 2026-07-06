@@ -12,24 +12,29 @@ from core.foam_engine import FoamCutterEngine
 # 2. UI層
 # ==========================================
 class FoamCutterGUI:
-    def __init__(self, root, root_file=None, tip_file=None, block_width=None, wing_type=None):
+    def __init__(self, root, root_file=None, tip_file=None, block_width=None, wing_type=None,
+                 target_type="Plank", target_thickness=0.0, cut_kerf=1.5, wire_dist=1000.0,
+                 offset_x=0.0, offset_y=0.0, entry_x=0.0, entry_y=0.0, feedrate=100.0):
         self.root = root
         self.root.title("4-Axis Foam Cutter CAM")
-        self.root.geometry("950x760") # ボタン追加に合わせて拡張
+        self.root.geometry("950x780")
         
         self.engine = FoamCutterEngine()
         
+        self.target_type = target_type
+        self.target_thickness = target_thickness
+
         self.root_profile_path = tk.StringVar(value=root_file if root_file else "")
         self.tip_profile_path = tk.StringVar(value=tip_file if tip_file else "")
-        self.kerf_width = tk.DoubleVar(value=1.5)
-        self.wire_dist = tk.DoubleVar(value=1000.0)
+        self.kerf_width = tk.DoubleVar(value=cut_kerf)
+        self.wire_dist = tk.DoubleVar(value=wire_dist)
         self.block_width = tk.DoubleVar(value=block_width if block_width else 910.0)
-        self.feedrate = tk.DoubleVar(value=100.0) 
+        self.feedrate = tk.DoubleVar(value=feedrate) 
         
-        self.offset_x = tk.DoubleVar(value=0.0)
-        self.offset_y = tk.DoubleVar(value=0.0)
-        self.entry_x = tk.DoubleVar(value=0.0)
-        self.entry_y = tk.DoubleVar(value=0.0)
+        self.offset_x = tk.DoubleVar(value=offset_x)
+        self.offset_y = tk.DoubleVar(value=offset_y)
+        self.entry_x = tk.DoubleVar(value=entry_x)
+        self.entry_y = tk.DoubleVar(value=entry_y)
         
         self.axis_lh = tk.StringVar(value="X")
         self.axis_lv = tk.StringVar(value="Y")
@@ -56,40 +61,51 @@ class FoamCutterGUI:
         cf = tk.Frame(self.root)
         cf.grid(row=0, column=0, padx=10, pady=10, sticky="n")
 
-        tk.Label(cf, text="Root Profile [.dxf]:").grid(row=0, column=0, sticky="w", pady=(0, 5))
-        tk.Entry(cf, textvariable=self.root_profile_path, width=30).grid(row=1, column=0)
-        tk.Button(cf, text="Browse", command=lambda: self.browse_file(self.root_profile_path)).grid(row=1, column=1, padx=5)
+        # --- Header Info ---
+        header_text = f"Target: {self.target_type}"
+        if self.target_thickness > 0:
+            header_text += f" (Thickness: {self.target_thickness:.1f} mm)"
+        tk.Label(cf, text=header_text, font=("Helvetica", 11, "bold"), fg="#2c3e50").pack(fill="x", pady=(0, 10))
 
-        tk.Label(cf, text="Tip Profile [.dxf]:").grid(row=2, column=0, sticky="w", pady=(10, 5))
-        tk.Entry(cf, textvariable=self.tip_profile_path, width=30).grid(row=3, column=0)
-        tk.Button(cf, text="Browse", command=lambda: self.browse_file(self.tip_profile_path)).grid(row=3, column=1, padx=5)
+        # --- File Section ---
+        ff = tk.LabelFrame(cf, text="Profiles", font=("Helvetica", 10, "bold"))
+        ff.pack(fill="x", pady=5, ipadx=5, ipady=5)
 
-        pf = tk.LabelFrame(cf, text="Settings")
-        pf.grid(row=4, column=0, columnspan=2, pady=15, sticky="ew")
+        tk.Label(ff, text="Root [.dxf]:").grid(row=0, column=0, sticky="e", pady=2)
+        tk.Entry(ff, textvariable=self.root_profile_path, width=25).grid(row=0, column=1)
+        tk.Button(ff, text="Browse", command=lambda: self.browse_file(self.root_profile_path)).grid(row=0, column=2, padx=2)
+
+        tk.Label(ff, text="Tip [.dxf]:").grid(row=1, column=0, sticky="e", pady=2)
+        tk.Entry(ff, textvariable=self.tip_profile_path, width=25).grid(row=1, column=1)
+        tk.Button(ff, text="Browse", command=lambda: self.browse_file(self.tip_profile_path)).grid(row=1, column=2, padx=2)
+
+        # --- Settings Section ---
+        pf = tk.LabelFrame(cf, text="Machine & Cut Settings", font=("Helvetica", 10, "bold"))
+        pf.pack(fill="x", pady=5, ipadx=5, ipady=5)
 
         params = [
             ("Kerf / 溶け幅 (mm):", self.kerf_width),
             ("Wire Dist / 電熱線距離 (mm):", self.wire_dist),
             ("Block Width / 材料幅 (mm):", self.block_width),
-            ("Feedrate / 送り速度 (mm/min):", self.feedrate)
+            ("Feedrate / 送り速度:", self.feedrate)
         ]
         for i, (label, var) in enumerate(params):
             tk.Label(pf, text=label).grid(row=i, column=0, sticky="e", padx=5, pady=2)
             tk.Entry(pf, textvariable=var, width=10).grid(row=i, column=1, sticky="w")
 
-        tk.Label(pf, text="Shape Offset / 図形配置:").grid(row=4, column=0, sticky="e", padx=5, pady=2)
+        tk.Label(pf, text="Offset (X, Y):").grid(row=4, column=0, sticky="e", padx=5, pady=2)
         of = tk.Frame(pf)
         of.grid(row=4, column=1, sticky="w")
         tk.Entry(of, textvariable=self.offset_x, width=5).pack(side="left")
         tk.Entry(of, textvariable=self.offset_y, width=5).pack(side="left", padx=5)
 
-        tk.Label(pf, text="Entry Point / 進入位置:").grid(row=5, column=0, sticky="e", padx=5, pady=2)
+        tk.Label(pf, text="Entry (X, Y):").grid(row=5, column=0, sticky="e", padx=5, pady=2)
         ef = tk.Frame(pf)
         ef.grid(row=5, column=1, sticky="w")
         tk.Entry(ef, textvariable=self.entry_x, width=5).pack(side="left")
         tk.Entry(ef, textvariable=self.entry_y, width=5).pack(side="left", padx=5)
 
-        tk.Label(pf, text="Cut Start Point:").grid(row=6, column=0, sticky="e", padx=5, pady=2)
+        tk.Label(pf, text="Start Point:").grid(row=6, column=0, sticky="e", padx=5, pady=2)
         sf = tk.Frame(pf)
         sf.grid(row=6, column=1, sticky="w")
         self.scale_shift = tk.Scale(sf, variable=self.start_shift_pct, from_=0, to=100, 
@@ -98,34 +114,55 @@ class FoamCutterGUI:
         self.lbl_pct = tk.Label(sf, text="0%")
         self.lbl_pct.pack(side="left")
 
-        tk.Label(pf, text="Axes (L_h, L_v, R_h, R_v):").grid(row=7, column=0, sticky="e", padx=5, pady=5)
-        af = tk.Frame(pf)
-        af.grid(row=7, column=1, sticky="w")
-        tk.Entry(af, textvariable=self.axis_lh, width=2).pack(side="left")
-        tk.Entry(af, textvariable=self.axis_lv, width=2).pack(side="left", padx=2)
-        tk.Entry(af, textvariable=self.axis_rh, width=2).pack(side="left", padx=2)
-        tk.Entry(af, textvariable=self.axis_rv, width=2).pack(side="left")
+        self.reverse_path = tk.BooleanVar(value=False)
+        tk.Checkbutton(pf, text="Reverse Direction", variable=self.reverse_path, command=self.update_preview).grid(row=7, column=1, sticky="w", pady=2)
+        
+
+        tk.Label(pf, text="Rotation (deg):").grid(row=8, column=0, sticky="e", padx=5, pady=2)
+        rf = tk.Frame(pf)
+        rf.grid(row=8, column=1, sticky="w")
+        self.rotation_angle = tk.DoubleVar(value=0.0)
+        tk.Entry(rf, textvariable=self.rotation_angle, width=5).pack(side="left")
+        tk.Button(rf, text="Auto Optimize", command=self.optimize_rotation).pack(side="left", padx=5)
+        self.rotation_angle.trace_add("write", lambda *args: self.update_preview())
+
+        self.smooth_curves = tk.BooleanVar(value=False)
+        tk.Checkbutton(pf, text="Smooth Curves", variable=self.smooth_curves, command=self.update_preview).grid(row=9, column=1, sticky="w", pady=2)
+
+        # --- G-Code Config ---
+        gcf = tk.LabelFrame(cf, text="G-Code Output", font=("Helvetica", 10, "bold"))
+        gcf.pack(fill="x", pady=5, ipadx=5, ipady=5)
+
+        tk.Label(gcf, text="Axes (Lh, Lv, Rh, Rv):").grid(row=0, column=0, sticky="e", padx=5, pady=2)
+        af = tk.Frame(gcf)
+        af.grid(row=0, column=1, sticky="w")
+        tk.Entry(af, textvariable=self.axis_lh, width=3).pack(side="left", padx=1)
+        tk.Entry(af, textvariable=self.axis_lv, width=3).pack(side="left", padx=1)
+        tk.Entry(af, textvariable=self.axis_rh, width=3).pack(side="left", padx=1)
+        tk.Entry(af, textvariable=self.axis_rv, width=3).pack(side="left", padx=1)
         for var in [self.axis_lh, self.axis_lv, self.axis_rh, self.axis_rv]:
             var.trace_add("write", lambda *args: self.draw_plot())
 
-        tk.Label(pf, text="Spindle / ヒーター制御:").grid(row=8, column=0, sticky="e", padx=5, pady=2)
-        hf = tk.Frame(pf)
-        hf.grid(row=8, column=1, sticky="w")
-        tk.OptionMenu(hf, self.spindle_mode, "M3 (Constant)", "M4 (Dynamic/Laser)").pack(side="left")
-        tk.Label(hf, text=" S-Value:").pack(side="left")
-        tk.Entry(hf, textvariable=self.s_value, width=6).pack(side="left")
+        tk.Label(gcf, text="Spindle:").grid(row=1, column=0, sticky="e", padx=5, pady=2)
+        hf = tk.Frame(gcf)
+        hf.grid(row=1, column=1, sticky="w")
+        tk.OptionMenu(hf, self.spindle_mode, "M3", "M4 (Dynamic/Laser)").pack(side="left")
+        tk.Label(hf, text=" S:").pack(side="left")
+        tk.Entry(hf, textvariable=self.s_value, width=4).pack(side="left")
 
-        tk.Label(pf, text="Wing Type:").grid(row=9, column=0, sticky="e", padx=5, pady=2)
-        wt_frame = tk.Frame(pf)
-        wt_frame.grid(row=9, column=1, sticky="w")
-        tk.Radiobutton(wt_frame, text="Right Wing (Root on Right)", variable=self.wing_type, value="Right").pack(side="left")
-        tk.Radiobutton(wt_frame, text="Left Wing (Root on Left)", variable=self.wing_type, value="Left").pack(side="left", padx=10)
+        tk.Label(gcf, text="Wing Type:").grid(row=2, column=0, sticky="e", padx=5, pady=2)
+        wt_frame = tk.Frame(gcf)
+        wt_frame.grid(row=2, column=1, sticky="w")
+        tk.Radiobutton(wt_frame, text="Right", variable=self.wing_type, value="Right").pack(side="left")
+        tk.Radiobutton(wt_frame, text="Left", variable=self.wing_type, value="Left").pack(side="left", padx=5)
         self.wing_type.trace_add("write", lambda *args: self.update_preview())
 
-        # ボタンを3つに拡張
-        tk.Button(cf, text="2D Preview", command=self.update_preview, bg="lightgreen", width=30).grid(row=5, column=0, columnspan=2, pady=(10,2))
-        tk.Button(cf, text="3D View (Ruled Surface)", command=self.show_3d_preview, bg="plum", width=30).grid(row=6, column=0, columnspan=2, pady=(2,10))
-        tk.Button(cf, text="Generate G-Code", command=self.generate_gcode, bg="lightblue", width=30).grid(row=7, column=0, columnspan=2)
+        # --- Actions ---
+        af = tk.Frame(cf)
+        af.pack(fill="x", pady=10)
+        tk.Button(af, text="2D Preview", command=self.update_preview, bg="lightgreen", width=30).pack(pady=3)
+        tk.Button(af, text="3D View (Ruled Surface)", command=self.show_3d_preview, bg="plum", width=30).pack(pady=3)
+        tk.Button(af, text="Generate G-Code", command=self.generate_gcode, bg="lightblue", width=30).pack(pady=3)
 
         prev_f = tk.Frame(self.root)
         prev_f.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
@@ -148,6 +185,20 @@ class FoamCutterGUI:
         
         if self.root_profile_path.get() and self.tip_profile_path.get():
             self.root.after(200, self.update_preview)
+
+
+    def optimize_rotation(self):
+        root_path = self.root_profile_path.get()
+        tip_path = self.tip_profile_path.get()
+        f1, f2 = (tip_path, root_path) if self.wing_type.get() == "Right" else (root_path, tip_path)
+        try:
+            ox = float(self.offset_x.get())
+            oy = float(self.offset_y.get())
+            opt_angle = self.engine.find_optimal_rotation(f1, f2, ox, oy)
+            self.rotation_angle.set(round(opt_angle, 1))
+            self.update_preview()
+        except Exception as e:
+            print(f"Optimization error: {e}")
 
     def browse_file(self, var):
         f = filedialog.askopenfilename(filetypes=[("DXF Files", "*.dxf")])
@@ -183,7 +234,7 @@ class FoamCutterGUI:
                 f1, f2, self.kerf_width.get(),
                 self.wire_dist.get(), self.block_width.get(),
                 self.offset_x.get(), self.offset_y.get(), self.start_shift_pct.get(),
-                auto_center=False
+                auto_center=False, reverse_path=self.reverse_path.get(), smooth_curves=self.smooth_curves.get(), rotation_angle=self.rotation_angle.get()
             )
             self.draw_plot()
         except Exception as e:
@@ -209,6 +260,15 @@ class FoamCutterGUI:
             
         self.ax.plot(machine_traj[:, 0], machine_traj[:, 1], color_m, linewidth=1.5, label="Machine Trajectory")
         self.ax.plot(foam_traj[:, 0], foam_traj[:, 1], color_f, linewidth=1.5, label="Foam Cut Profile")
+        
+        # Add a prominent directional arrow near the cut start point
+        if len(machine_traj) > 5:
+            p_start = machine_traj[0]
+            idx_target = min(len(machine_traj) - 1, max(10, int(len(machine_traj) * 0.05)))
+            p_target = machine_traj[idx_target]
+            self.ax.annotate('', xy=p_target, xytext=p_start,
+                             arrowprops=dict(arrowstyle="-|>", color='red', lw=3, mutation_scale=25))
+
         self.ax.plot([ex, machine_traj[0, 0]], [ey, machine_traj[0, 1]], color='orange', linestyle='--', label="Lead In")
         self.ax.plot(machine_traj[0, 0], machine_traj[0, 1], 'ro', markersize=6, label="Cut Start")
         self.ax.plot(ex, ey, 'gX', markersize=10, label="Entry/Exit Point")

@@ -88,15 +88,21 @@ class FoamCutterEngine:
         if len(points) < 2: return 0
         return np.sum(np.linalg.norm(np.diff(points, axis=0), axis=1))
 
-    def _resample_points(self, points, target_count):
-        if len(points) == target_count:
+    def _resample_points(self, points, target_count, smooth=False):
+        if len(points) < 2:
             return points
-        distances = np.cumsum(np.sqrt(np.sum(np.diff(points, axis=0)**2, axis=1)))
+
+        diffs = np.diff(points, axis=0)
+        distances = np.cumsum(np.linalg.norm(diffs, axis=1))
         distances = np.insert(distances, 0, 0)
-        target_distances = np.linspace(0, distances[-1], target_count)
         
+        if distances[-1] == 0:
+            return np.full((target_count, 2), points[0])
+
+        target_distances = np.linspace(0, distances[-1], target_count)
+
         # 鋭角の角を検出して保護する（面取り防止）
-        corners = []
+        corner_indices = [0]
         for i in range(1, len(points)-1):
             v1 = points[i] - points[i-1]
             v2 = points[i+1] - points[i]
@@ -105,17 +111,62 @@ class FoamCutterEngine:
             if n1 > 1e-5 and n2 > 1e-5:
                 cos_th = np.clip(np.dot(v1, v2) / (n1 * n2), -1.0, 1.0)
                 if np.arccos(cos_th) > 0.5: # 約28度以上の折れ曲がり
-                    corners.append(distances[i])
-        
-        for c_dist in corners:
-            idx = np.argmin(np.abs(target_distances - c_dist))
-            if idx > 0 and c_dist <= target_distances[idx-1]: continue
-            if idx < target_count - 1 and c_dist >= target_distances[idx+1]: continue
-            target_distances[idx] = c_dist
+                    corner_indices.append(i)
+        corner_indices.append(len(points)-1)
+
+        for idx in corner_indices:
+            c_dist = distances[idx]
+            t_idx = np.argmin(np.abs(target_distances - c_dist))
+            if t_idx > 0 and c_dist <= target_distances[t_idx-1]: continue
+            if t_idx < target_count - 1 and c_dist >= target_distances[t_idx+1]: continue
+            target_distances[t_idx] = c_dist
+
+        if not smooth:
+            x_interp = np.interp(target_distances, distances, points[:, 0])
+            y_interp = np.interp(target_distances, distances, points[:, 1])
+            return np.column_stack((x_interp, y_interp))
+        else:
+            from scipy.interpolate import make_interp_spline
+            x_interp = np.zeros(target_count)
+            y_interp = np.zeros(target_count)
             
-        x_interp = np.interp(target_distances, distances, points[:, 0])
-        y_interp = np.interp(target_distances, distances, points[:, 1])
-        return np.column_stack((x_interp, y_interp))
+            for k in range(len(corner_indices)-1):
+                start_i = corner_indices[k]
+                end_i = corner_indices[k+1]
+                
+                d_start = distances[start_i]
+                d_end = distances[end_i]
+                
+                t_mask = (target_distances >= d_start) & (target_distances <= d_end)
+                t_segment = target_distances[t_mask]
+                
+                if len(t_segment) == 0:
+                    continue
+                    
+                seg_points = points[start_i:end_i+1]
+                seg_dists = distances[start_i:end_i+1]
+                
+                unique_idx = np.unique(seg_dists, return_index=True)[1]
+                seg_dists = seg_dists[unique_idx]
+                seg_points = seg_points[unique_idx]
+                
+                if len(seg_points) < 2:
+                    x_interp[t_mask] = seg_points[0, 0]
+                    y_interp[t_mask] = seg_points[0, 1]
+                elif len(seg_points) < 4:
+                    x_interp[t_mask] = np.interp(t_segment, seg_dists, seg_points[:, 0])
+                    y_interp[t_mask] = np.interp(t_segment, seg_dists, seg_points[:, 1])
+                else:
+                    try:
+                        spline_x = make_interp_spline(seg_dists, seg_points[:, 0], k=3)
+                        spline_y = make_interp_spline(seg_dists, seg_points[:, 1], k=3)
+                        x_interp[t_mask] = spline_x(t_segment)
+                        y_interp[t_mask] = spline_y(t_segment)
+                    except Exception:
+                        x_interp[t_mask] = np.interp(t_segment, seg_dists, seg_points[:, 0])
+                        y_interp[t_mask] = np.interp(t_segment, seg_dists, seg_points[:, 1])
+                        
+            return np.column_stack((x_interp, y_interp))
 
     def _shift_path(self, pts, shift_pct):
         if len(pts) <= 1 or shift_pct == 0.0:
@@ -173,7 +224,37 @@ class FoamCutterEngine:
             
         return offset_points
 
-    def compute_trajectory(self, f1, f2, kerf, wire_l, block_w, ox, oy, shift_pct, auto_center=True):
+
+    def find_optimal_rotation(self, f1, f2, ox=0.0, oy=0.0):
+        if not f1 or not f2: return 0.0
+        pts1 = self.parse_dxf(f1)
+        pts2 = self.parse_dxf(f2)
+        
+        # Apply offsets BEFORE evaluating bounding box
+        pts2[:, 0] += ox
+        pts2[:, 1] += oy
+        
+        all_pts = np.vstack((pts1, pts2)).astype(float)
+        cx = (np.min(all_pts[:, 0]) + np.max(all_pts[:, 0])) / 2.0
+        cy = (np.min(all_pts[:, 1]) + np.max(all_pts[:, 1])) / 2.0
+        all_pts -= np.array([cx, cy])
+
+        min_height = float('inf')
+        best_angle = 0.0
+        # Check angles between -90 and 90 degrees with 0.5 degree precision
+        for angle in np.arange(-90.0, 90.0, 0.5):
+            rad = np.radians(angle)
+            c, s = np.cos(rad), np.sin(rad)
+            R = np.array([[c, -s], [s, c]])
+            rotated = np.dot(all_pts, R.T)
+            height = np.max(rotated[:, 1]) - np.min(rotated[:, 1])
+            if height < min_height:
+                min_height = height
+                best_angle = angle
+
+        return float(best_angle)
+
+    def compute_trajectory(self, f1, f2, kerf, wire_l, block_w, ox, oy, shift_pct, auto_center=True, reverse_path=False, smooth_curves=False, rotation_angle=0.0):
         if not f1 or not f2:
             raise ValueError("Files not specified")
 
@@ -186,10 +267,14 @@ class FoamCutterEngine:
         if f2 != self.cached_file2 or mtime2 != self.cached_mtime2 or self.cached_pts2 is None:
             self.cached_pts2 = self.parse_dxf(f2)
             self.cached_file2, self.cached_mtime2 = f2, mtime2
-            
+
         pts1 = np.copy(self.cached_pts1)
         pts2 = np.copy(self.cached_pts2)
-        
+
+        if reverse_path:
+            pts1 = pts1[::-1]
+            pts2 = pts2[::-1]
+
         if auto_center:
             all_pts = np.vstack((pts1, pts2))
             cx = (np.min(all_pts[:, 0]) + np.max(all_pts[:, 0])) / 2.0
@@ -197,13 +282,25 @@ class FoamCutterEngine:
             pts1 -= np.array([cx, cy])
             pts2 -= np.array([cx, cy])
 
+        
+        if rotation_angle != 0.0:
+            rad = np.radians(rotation_angle)
+            c, s = np.cos(rad), np.sin(rad)
+            R = np.array([[c, -s], [s, c]])
+            pts1 = np.dot(pts1, R.T)
+            pts2 = np.dot(pts2, R.T)
+
+        pts1[:, 0] += ox; pts1[:, 1] += oy
+
+        pts2[:, 0] += ox; pts2[:, 1] += oy
+
         len1 = self._get_path_length(pts1)
         len2 = self._get_path_length(pts2)
         density_pts = int(max(len1, len2) / 0.5)
         max_pts = max(len(pts1), len(pts2), density_pts)
         
-        pts1 = self._shift_path(self._resample_points(pts1, max_pts), shift_pct)
-        pts2 = self._shift_path(self._resample_points(pts2, max_pts), shift_pct)
+        pts1 = self._shift_path(self._resample_points(pts1, max_pts, smooth=smooth_curves), shift_pct)
+        pts2 = self._shift_path(self._resample_points(pts2, max_pts, smooth=smooth_curves), shift_pct)
 
         pts1 = self._apply_kerf_offset(pts1, kerf)
         pts2 = self._apply_kerf_offset(pts2, kerf)
@@ -213,8 +310,8 @@ class FoamCutterEngine:
         foam_xy, foam_az = [], [] 
         
         for i in range(max_pts):
-            x_s, y_s = pts1[i][0] + ox, pts1[i][1] + oy
-            u_s, v_s = pts2[i][0] + ox, pts2[i][1] + oy
+            x_s, y_s = pts1[i][0], pts1[i][1]
+            u_s, v_s = pts2[i][0], pts2[i][1]
 
             x_t = x_s - (u_s - x_s) * (margin / block_w)
             y_t = y_s - (v_s - y_s) * (margin / block_w)

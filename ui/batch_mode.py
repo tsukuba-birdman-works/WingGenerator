@@ -55,22 +55,37 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
     def _get_builder_params(self):
         """3DビルダーやDXFエクスポーターに渡すためのパラメータを辞書として収集・整理する"""
 
-        # X-Brace Zones
+        import tkinter as tk
         xb_zones = []
+        xb_offset = self.safe_float(getattr(self, 'xbrace_offset', tk.StringVar(value='0.0')))
         for s_var, e_var in [(self.xb_start_a, self.xb_end_a), (self.xb_start_b, self.xb_end_b), (self.xb_start_c, self.xb_end_c)]:
             try:
                 s_str, e_str = s_var.get().strip(), e_var.get().strip()
                 if s_str and e_str:
-                    xb_zones.append((float(s_str), float(e_str), 0.0))  # No offset in batch mode
+                    xb_zones.append((float(s_str), float(e_str), xb_offset))
             except Exception:
                 pass
 
+        # Joint Sleeves
+        joint_sleeves = []
+        for i in [1, 2]:
+            act_var = getattr(self, f'js{i}_act', tk.BooleanVar(value=False))
+            if act_var.get():
+                joint_sleeves.append({
+                    'start': self.safe_float(getattr(self, f'js{i}_start')),
+                    'end': self.safe_float(getattr(self, f'js{i}_end')),
+                    'out_dia': self.safe_float(getattr(self, f'js{i}_out_dia')),
+                    't1': self.safe_float(getattr(self, f'js{i}_t1')),
+                    't2': self.safe_float(getattr(self, f'js{i}_t2')),
+                })
+
         # Connectors
         connectors = []
-        for y_v in [self.conn1_y, self.conn2_y, self.conn3_y, self.conn4_y]:
+        for y_v, t_v in zip([self.conn1_y, self.conn2_y, self.conn3_y, self.conn4_y], 
+                            [self.conn1_type, self.conn2_type, self.conn3_type, self.conn4_type]):
             y_str = y_v.get().strip()
             if y_str:
-                try: connectors.append((float(y_str), "V-Shape")) # hardcoded to V-Shape for now since type UI was removed
+                try: connectors.append((float(y_str), t_v.get().strip()))
                 except ValueError: pass
 
         # Carbon Rib Configs
@@ -88,16 +103,22 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
         # Tab Support params handling for compatibility
         truss_tab_width = self.safe_float(self.truss_tab_width, 4.0)
         ms_tab_w, ms_tab_d = 4.0, 10.0
+        
+        wing_name = getattr(self, 'wing_name', tk.StringVar(value='')).get().strip().replace('/', '_').replace('\\', '_')
 
         return {
-            'file1': self.file1_path.get(), 'file2': self.file2_path.get(), 'y_positions': self.y_positions,
+            'file1': os.path.abspath(self.file1_path.get()) if self.file1_path.get() else '', 
+            'file2': os.path.abspath(self.file2_path.get()) if self.file2_path.get() else '', 
+            'y_positions': self.y_positions,
             'truss_angles_dict': getattr(self, 'truss_angles_dict', {}), 'stringers_data': getattr(self, 'get_stringers_data', lambda: [])(),
             'wing_type': getattr(self, 'wing_type', tk.StringVar(value="Linear")).get(),
-            **{k: self.safe_float(getattr(self, k)) for k in ['joint_length', 'wing_span', 'chord_root', 'chord_tip', 'spar_pos_root', 'spar_pos_tip', 'washout_root', 'washout_tip', 'spar_hole_dia', 'front_spar_dx', 'front_spar_dy', 'front_spar_dia', 'rear_spar_dx', 'rear_spar_dy', 'rear_spar_dia', 'plank_start', 'plank_end', 'plank_thick', 'plank_part_start', 'plank_part_end', 'te_cut', 'beam_width', 'edge_beam_width', 'margin_spar', 'margin_bolt', 'margin_outer', 'margin_outer_edge', 'base_truss_angle', 'truss_fillet', 'min_hole_dia', 'xbrace_dia', 'rib_thick', 'cr_thick', 'te_cap_thick', 'rc1_start', 'rc1_end', 'rc1_thick', 'rc1_width', 'rc2_start', 'rc2_end', 'rc2_thick', 'rc2_width'] if hasattr(self, k)},
+            'wing_name': wing_name,
+            **{k: self.safe_float(getattr(self, k)) for k in ['joint_length', 'wing_span', 'chord_root', 'chord_tip', 'spar_pos_root', 'spar_pos_tip', 'washout_root', 'washout_tip', 'base_aoa', 'spar_hole_dia', 'spar_hole_dv', 'front_spar_dx', 'front_spar_dy', 'front_spar_dia', 'rear_spar_dx', 'rear_spar_dy', 'rear_spar_dia', 'plank_start', 'plank_end', 'plank_thick', 'plank_part_start', 'plank_part_end', 'te_cut', 'beam_width', 'edge_beam_width', 'margin_spar', 'margin_bolt', 'margin_outer', 'margin_outer_edge', 'base_truss_angle', 'truss_fillet', 'min_hole_dia', 'xbrace_dia', 'xbrace_wire_dia', 'xbrace_offset', 'rib_thick', 'cr_thick', 'te_cap_thick', 'rc1_start', 'rc1_end', 'rc1_thick', 'rc1_width', 'rc2_start', 'rc2_end', 'rc2_thick', 'rc2_width'] if hasattr(self, k)},
             **{k: self.safe_int(getattr(self, k)) for k in ['truss_front_n', 'truss_rear_n'] if hasattr(self, k)},
-            **{k: self.pm.vars[k].get() for k in ['safe_margin_var', 'te_cap_uf_act', 'te_cap_lf_act', 'te_cap_ur_act', 'te_cap_lr_act', 'rc1_act', 'rc2_act', 'diag1_active', 'diag2_active'] if k in self.pm.vars},
-            **{k: getattr(self, k).get() for k in ['export_main_spar', 'export_front_spar', 'export_rear_spar', 'export_plank', 'export_te', 'export_connectors', 'export_stringers', 'export_xbrace_wires', 'export_diag_spars', 'export_carbon_ribs', 'export_te_caps', 'export_rib_caps', 'export_film'] if hasattr(self, k)},
-            **{f'mat_{k}': getattr(self, f'mat_{k}').get() for k in ['ribs', 'main_spar', 'front_spar', 'rear_spar', 'plank', 'te', 'connectors', 'stringers', 'xbrace_wires', 'diag_spars', 'carbon_ribs', 'te_caps', 'rib_caps', 'film'] if hasattr(self, f'mat_{k}')},
+            **{k: self.pm.vars[k].get() for k in ['safe_margin_var', 'te_cap_uf_act', 'te_cap_lf_act', 'te_cap_ur_act', 'te_cap_lr_act', 'rc1_act', 'rc2_act', 'diag1_active', 'diag2_active', 'jig_y_positions', 'jig_base_height', 'jig_base_thickness', 'jig_wall_thickness', 'jig_pillar_angle', 'jig_te_stopper_height', 'jig_slot_interval', 'jig_slot_width', 'jig_slot_depth', 'dxf_layer_rib_outline', 'dxf_layer_holes', 'dxf_layer_truss', 'dxf_layer_plank', 'dxf_layer_te_part', 'dxf_layer_jig_outline', 'dxf_all_in_one'] if k in self.pm.vars},
+            'dxf_selections': {k: v.get() for k, v in getattr(self, 'dxf_selection_vars', {}).items()},
+            **{k: getattr(self, k).get() for k in ['export_main_spar', 'export_front_spar', 'export_rear_spar', 'export_plank', 'export_te', 'export_connectors', 'export_stringers', 'export_xbrace_wires', 'export_diag_spars', 'export_carbon_ribs', 'export_te_caps', 'export_rib_caps', 'export_film', 'export_joint_sleeves'] if hasattr(self, k)},
+            **{f'mat_{k}': getattr(self, f'mat_{k}').get() for k in ['ribs', 'main_spar', 'front_spar', 'rear_spar', 'plank', 'te', 'connectors', 'stringers', 'xbrace_wires', 'diag_spars', 'carbon_ribs', 'te_caps', 'rib_caps', 'film', 'js_cap', 'js_foam', 'js_skin'] if hasattr(self, f'mat_{k}')},
             'main_spar_inner_dia': self.safe_float(self.main_spar_inner_dia),
             'front_spar_inner_dia': self.safe_float(self.front_spar_inner_dia),
             'rear_spar_inner_dia': self.safe_float(self.rear_spar_inner_dia),
@@ -108,7 +129,7 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             'root_bolt2': (self.safe_float(self.root_bolt2_dx), self.safe_float(self.root_bolt2_dy), self.safe_float(self.root_bolt2_dia)) if hasattr(self, 'root_bolt2_dx') else (0,0,0),
             'tip_bolt1': (self.safe_float(self.tip_bolt1_dx), self.safe_float(self.tip_bolt1_dy), self.safe_float(self.tip_bolt1_dia)) if hasattr(self, 'tip_bolt1_dx') else (0,0,0),
             'tip_bolt2': (self.safe_float(self.tip_bolt2_dx), self.safe_float(self.tip_bolt2_dy), self.safe_float(self.tip_bolt2_dia)) if hasattr(self, 'tip_bolt2_dx') else (0,0,0),
-            'xb_zones': xb_zones, 'connectors': connectors, 'carbon_rib_configs': carbon_rib_configs,
+            'xb_zones': xb_zones, 'connectors': connectors, 'carbon_rib_configs': carbon_rib_configs, 'joint_sleeves': joint_sleeves,
             'diag1_y_main': diag1_ym, 'diag1_y_rear': diag1_yr, 'diag1_range': (min(diag1_ym, diag1_yr), max(diag1_ym, diag1_yr)) if abs(diag1_yr - diag1_ym) > 1e-5 else (-1,-1),
             'diag2_y_main': diag2_ym, 'diag2_y_rear': diag2_yr, 'diag2_range': (min(diag2_ym, diag2_yr), max(diag2_ym, diag2_yr)) if abs(diag2_yr - diag2_ym) > 1e-5 else (-1,-1),
             'te_cap_uf_w': getattr(self, 'safe_float')(getattr(self, 'te_cap_uf_w', tk.StringVar(value="0.0"))), 
@@ -162,6 +183,7 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             ttk.Button(self.pm.obj.tabs_frames['Foam'], text="Open in Foam CAM", command=self.open_in_foam_cam).pack(fill=tk.X, padx=10, pady=5)
             
         if 'DXF' in self.pm.obj.tabs_frames:
+            self.create_dxf_selection_ui(self.pm.obj.tabs_frames['DXF'])
             ttk.Button(self.pm.obj.tabs_frames['DXF'], text="Export DXF", command=self.export_dxf).pack(fill=tk.X, padx=10, pady=5)
 
         # Add Export Buttons to Export3D tab
@@ -241,6 +263,24 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             if self.cr_tip_in_act.get() and len(self.y_positions) > 0: items.append({'type': 'carbon', 'loc': 'tip', 'pos': 'inner', 'idx': len(self.y_positions)-1, 'y_local': self.y_positions[-1], 'label': f"C-Rib Tip Inner (Y={self.y_positions[-1] + joint:.1f}mm)"})
             if self.cr_tip_out_act.get() and len(self.y_positions) > 0: items.append({'type': 'carbon', 'loc': 'tip', 'pos': 'outer', 'idx': len(self.y_positions)-1, 'y_local': self.y_positions[-1], 'label': f"C-Rib Tip Outer (Y={self.y_positions[-1] + joint:.1f}mm)"})
             
+            
+            try:
+                jig_str = self.pm.vars.get('jig_y_positions').get() if 'jig_y_positions' in self.pm.vars else ''
+                if jig_str:
+                    jigs = [float(v.strip()) for v in jig_str.split(',') if v.strip()]
+                    for j_idx, jy in enumerate(jigs):
+                        # Find closest rib index (or just assign a dummy idx)
+                        # We use idx to get truss_angles_dict.
+                        # It's better to find closest rib index to use its truss angle.
+                        closest_idx = 0
+                        min_dist = 99999
+                        for r_idx, ry in enumerate(self.y_positions):
+                            if abs(ry - jy) < min_dist:
+                                min_dist = abs(ry - jy)
+                                closest_idx = r_idx
+                        items.append({'type': 'jig', 'idx': closest_idx, 'jig_idx': j_idx, 'y_local': jy, 'label': f"Jig {j_idx} (Y={jy + joint:.1f}mm)"})
+            except Exception as e: print("Jig preview extraction error:", e)
+
             self.preview_items = items
             c_values = [item['label'] for item in items]
             self.combo_rib['values'] = c_values
@@ -260,7 +300,63 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
                     if self.combo_foam_end.current() < 0: self.combo_foam_end.current(len(c_values)-1)
                     
             self.on_rib_select_fast(None)
+            self.update_dxf_selection_ui()
         except Exception: pass
+
+    def create_dxf_selection_ui(self, parent):
+        import tkinter as tk
+        from tkinter import ttk
+        
+        frame = ttk.LabelFrame(parent, text="Rib/Jig Export Selection")
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        canvas = tk.Canvas(frame)
+        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+        self.dxf_scrollable_frame = ttk.Frame(canvas)
+        
+        self.dxf_scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(
+                scrollregion=canvas.bbox("all")
+            )
+        )
+        
+        canvas.create_window((0, 0), window=self.dxf_scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        self.dxf_selection_vars = {}
+        
+    def update_dxf_selection_ui(self):
+        import tkinter as tk
+        from tkinter import ttk
+        if not hasattr(self, 'dxf_scrollable_frame'): return
+        
+        for widget in self.dxf_scrollable_frame.winfo_children():
+            widget.destroy()
+            
+        self.dxf_selection_vars.clear()
+        
+        if hasattr(self, 'preview_items'):
+            for item in self.preview_items:
+                var = tk.BooleanVar(value=True)
+                key = f"{item['type']}_{item.get('loc', '')}_{item.get('pos', '')}_{item['idx']}"
+                self.dxf_selection_vars[key] = var
+                ttk.Checkbutton(self.dxf_scrollable_frame, text=item['label'], variable=var).pack(anchor="w", padx=5)
+                
+        try:
+            jig_str = self.pm.vars.get('jig_y_positions').get() if 'jig_y_positions' in self.pm.vars else ''
+            if jig_str:
+                jigs = [float(v.strip()) for v in jig_str.split(',') if v.strip()]
+                for j_idx, jy in enumerate(jigs):
+                    var = tk.BooleanVar(value=True)
+                    key = f"jig_{j_idx}"
+                    self.dxf_selection_vars[key] = var
+                    ttk.Checkbutton(self.dxf_scrollable_frame, text=f"Jig No.{j_idx} (Y={jy:.1f}mm)", variable=var).pack(anchor="w", padx=5)
+        except Exception:
+            pass
 
     def open_in_foam_cam(self):
         idx_start = self.combo_foam_start.current()
@@ -382,15 +478,45 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
         try:
             p = self._get_builder_params()
             p['fast_mode'] = fast_mode
-            res = self.engine.generate_rib_at_y(p, y_local, idx, t_rib, is_carbon=is_carbon, te_cut_override=te_cut_val)
-            self.last_warnings = res.warnings_list
-            chord, spar_pct, washout, blend, local_xb_pct, x_dia = self.get_local_params(y_local)
-            angle = p['truss_angles_dict'].get(idx, p['base_truss_angle'])
-            title = f"{item['label']} - Chord: {chord:.1f}mm, Washout: {washout:.2f}°, Truss: {angle:.1f}°" + (" [FAST PREVIEW]" if fast_mode else "")
-            self.draw_plot(*res[:12], self.last_warnings, res.plank_poly_rot, res.te_part_coords, res.c_b1, res.hole_b1, res.c_b2, res.hole_b2, res.diag_poly_pts_list, res.final_rib_orig, title, res.te_cap_pts_list, res.rc_cap_pts_list)
+            
+            if item.get('type') == 'jig':
+                res_jig = self.engine.generate_jig_at_y(p, y_local, return_full=True)
+                self.last_warnings = []
+                chord, spar_pct, washout, blend, local_xb_pct, x_dia = self.get_local_params(y_local)
+                title = f"{item['label']} - Chord: {chord:.1f}mm, Washout: {washout:.2f}°" + (" [FAST PREVIEW]" if fast_mode else "")
+                
+                dummy_pts = np.array([])
+                c_m = np.array(res_jig['c_m']) if res_jig and 'c_m' in res_jig else dummy_pts
+                c_f = np.array(res_jig['c_f']) if res_jig and 'c_f' in res_jig else dummy_pts
+                c_r = np.array(res_jig['c_r']) if res_jig and 'c_r' in res_jig else dummy_pts
+                
+                def make_circle(c, d, dv=0):
+                    if d <= 0 or len(c) < 2: return dummy_pts
+                    ang = np.linspace(0, 2*np.pi, 60)
+                    r_h = d / 2
+                    r_v = (dv if dv > 0 else d) / 2
+                    return np.column_stack((c[0] + r_h*np.cos(ang), c[1] + r_v*np.sin(ang)))
+                
+                h_m = make_circle(c_m, res_jig.get('d_m', 0) if res_jig else 0, res_jig.get('dv_m', 0) if res_jig else 0)
+                h_f = make_circle(c_f, res_jig.get('d_f', 0) if res_jig else 0)
+                h_r = make_circle(c_r, res_jig.get('d_r', 0) if res_jig else 0)
+                
+                jig_pts = np.array(res_jig.get('jig_pts', []) or []) if res_jig else dummy_pts
+                wing_pts = np.array(res_jig.get('wing_pts', []) or []) if res_jig else dummy_pts
+                
+                # Pass empty rib_pts so the wing shape isn't drawn as "Rib Shape".
+                # wing_pts is passed as the jig reference via jig context; jig_pts is the real outline.
+                self.draw_plot(dummy_pts, c_m, h_m, c_r, h_r, c_f, h_f, [], [], [], [], [], [], dummy_pts, dummy_pts, dummy_pts, dummy_pts, dummy_pts, dummy_pts, [], None, title, jig_pts=jig_pts, jig_wing_pts=wing_pts)
+            else:
+                res = self.engine.generate_rib_at_y(p, y_local, idx, t_rib, is_carbon=is_carbon, te_cut_override=te_cut_val)
+                self.last_warnings = res.warnings_list
+                chord, spar_pct, washout, blend, local_xb_pct, x_dia = self.get_local_params(y_local)
+                angle = p['truss_angles_dict'].get(idx, p['base_truss_angle'])
+                title = f"{item['label']} - Chord: {chord:.1f}mm, Washout: {washout:.2f}°, Truss: {angle:.1f}°" + (" [FAST PREVIEW]" if fast_mode else "")
+                self.draw_plot(*res[:12], self.last_warnings, res.plank_poly_rot, res.te_part_coords, res.c_b1, res.hole_b1, res.c_b2, res.hole_b2, res.diag_poly_pts_list, res.final_rib_orig, title, res.te_cap_pts_list, res.rc_cap_pts_list)
         except Exception as e: print("Preview Error:", e)
 
-    def draw_plot(self, rib_pts, c_m, h_m, c_r, h_r, c_f, h_f, t_holes, xb_act, xb_c_act, xb_skip, xb_c_skip, warnings_list, plank_poly, te_part, c_b1, hole_b1, c_b2, hole_b2, diag_poly_pts_list, final_rib_orig, title, te_cap_pts_list=None, rc_cap_pts_list=None):
+    def draw_plot(self, rib_pts, c_m, h_m, c_r, h_r, c_f, h_f, t_holes, xb_act, xb_c_act, xb_skip, xb_c_skip, warnings_list, plank_poly, te_part, c_b1, hole_b1, c_b2, hole_b2, diag_poly_pts_list, final_rib_orig, title, te_cap_pts_list=None, rc_cap_pts_list=None, jig_pts=None, jig_wing_pts=None):
         self.ax.clear(); self.ax.grid(True, linestyle='--', alpha=0.7); self.ax.set_aspect('equal', adjustable='datalim')
         if len(rib_pts) > 0:
             self.ax.plot(rib_pts[:, 0], rib_pts[:, 1], 'b-', linewidth=2, label="Rib Shape")
@@ -421,8 +547,14 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             drawn_rc_cap = False
             for cap_pts in rc_cap_pts_list[0] + rc_cap_pts_list[1]:
                 if len(cap_pts) > 0:
-                    self.ax.plot(cap_pts[:, 0], cap_pts[:, 1], color='red', linestyle='-', linewidth=2, label="Rib Cap" if not drawn_rc_cap else "")
+                    self.ax.plot(cap_pts[:, 0], cap_pts[:, 1], color='darkgreen', linestyle='-', linewidth=2, label="Rib Cap" if not drawn_rc_cap else "")
                     drawn_rc_cap = True
+        # Jig preview: draw wing reference shape faintly, then jig outline prominently
+        if jig_wing_pts is not None and len(jig_wing_pts) > 0:
+            self.ax.plot(jig_wing_pts[:, 0], jig_wing_pts[:, 1], color='steelblue', linestyle='--', linewidth=1.2, alpha=0.5, label="Wing Shape (ref)")
+        if jig_pts is not None and len(jig_pts) > 0:
+            jig_arr = np.array(jig_pts)
+            self.ax.plot(jig_arr[:, 0], jig_arr[:, 1], color='red', linestyle='-', linewidth=2.5, label="Jig Outline")
         if warnings_list: self.ax.text(0.5, 0.95, "⚠️ " + " / ".join(warnings_list), transform=self.ax.transAxes, color='white', fontsize=12, fontweight='bold', ha='center', va='top', bbox=dict(facecolor='red', alpha=0.8, edgecolor='none', pad=5))
         self.ax.set_title(title); self.ax.set_xlabel("X (mm)"); self.ax.set_ylabel("Y (mm)")
         handles, labels = self.ax.get_legend_handles_labels(); by_label = dict(zip(labels, handles)); self.ax.legend(by_label.values(), by_label.keys())
@@ -461,6 +593,9 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
         if not f1 or not f2 or not os.path.exists(f1) or not os.path.exists(f2): return messagebox.showerror("Error", "Please select valid files.")
         if not self.y_positions: return messagebox.showerror("Error", "No rib positions generated. Check span and interval.")
             
+        wing_name = getattr(self, 'wing_name', tk.StringVar(value='')).get().strip().replace('/', '_').replace('\\', '_')
+        default_name = f"{wing_name}_Wing" if wing_name else "Wing"
+
         filepath = filedialog.asksaveasfilename(
             title="Save 3D Model",
             defaultextension=".glb",

@@ -32,6 +32,7 @@ class RibParameters:
     spar_pct: float
     washout_deg: float
     spar_hole_dia: float
+    spar_hole_dv: float
     rear_dx: float
     rear_dy: float
     rear_dia: float
@@ -583,7 +584,7 @@ class RibGeneratorEngine:
             return x_int, y_start + slope * (x_int - x_start)
         return x_end, y_start + slope * (x_end - x_start)
 
-    def get_start_x(self, center_x, center_y, R_prot, angle_deg, x_dir, start_upper, u_x, u_y, l_x, l_y, x_bound):
+    def get_start_x(self, center_x, center_y, R_h_prot, R_v_prot, angle_deg, x_dir, start_upper, u_x, u_y, l_x, l_y, x_bound):
         x_curr = center_x
         to_upper = not start_upper
         if x_dir == 1:
@@ -592,14 +593,15 @@ class RibGeneratorEngine:
             m = -np.tan(np.radians(angle_deg)) if to_upper else np.tan(np.radians(angle_deg))
         
         step = 0.5 * x_dir
+        R_eff = np.sqrt((R_h_prot**2) * (m**2) + R_v_prot**2) / np.sqrt(m**2 + 1)
         while (x_dir == 1 and x_curr < x_bound) or (x_dir == -1 and x_curr > x_bound):
             y_curr = np.interp(x_curr, u_x, u_y) if start_upper else np.interp(x_curr, l_x, l_y)
             dist = abs(m * center_x - center_y - m * x_curr + y_curr) / np.sqrt(m**2 + 1)
             x_at_cy = x_curr + (center_y - y_curr) / m if m != 0 else x_curr
             
-            if dist >= R_prot:
-                if x_dir == 1 and x_at_cy >= center_x + R_prot: return x_curr
-                if x_dir == -1 and x_at_cy <= center_x - R_prot: return x_curr
+            if dist >= R_eff:
+                if x_dir == 1 and x_at_cy >= center_x + R_h_prot: return x_curr
+                if x_dir == -1 and x_at_cy <= center_x - R_h_prot: return x_curr
             x_curr += step
         return x_curr
 
@@ -701,6 +703,7 @@ class RibGeneratorEngine:
         spar_pct = p.spar_pct
         washout_deg = p.washout_deg
         spar_hole_dia = p.spar_hole_dia
+        spar_hole_dv = p.spar_hole_dv
         rear_dx = p.rear_dx
         rear_dy = p.rear_dy
         rear_dia = p.rear_dia
@@ -903,12 +906,15 @@ class RibGeneratorEngine:
 
         minx_guide = min(np.min(u_x_guide), np.min(l_x_guide))
         maxx_guide = max(np.max(u_x_guide), np.max(l_x_guide))
+        
+        dh_prot = spar_hole_dia/2.0 + margin_spar
+        dv_prot = spar_hole_dv/2.0 + margin_spar if spar_hole_dv > 0 else dh_prot
 
-        start_x_f = self.get_start_x(spar_x, spar_y, spar_hole_dia/2.0 + margin_spar, truss_angle, -1, False, u_x_guide, u_y_guide, l_x_guide, l_y_guide, minx_guide)
+        start_x_f = self.get_start_x(spar_x, spar_y, dh_prot, dv_prot, truss_angle, -1, False, u_x_guide, u_y_guide, l_x_guide, l_y_guide, minx_guide)
         b_f_ideal = self.generate_zigzag_raw(start_x_f, truss_front_n + 1, -1, truss_angle, False, u_x_guide, u_y_guide, l_x_guide, l_y_guide, minx_guide)
         blocks_f = [b_f_ideal] if b_f_ideal else []
 
-        start_x_r = self.get_start_x(spar_x, spar_y, spar_hole_dia/2.0 + margin_spar, truss_angle, 1, True, u_x_guide, u_y_guide, l_x_guide, l_y_guide, maxx_guide)
+        start_x_r = self.get_start_x(spar_x, spar_y, dh_prot, dv_prot, truss_angle, 1, True, u_x_guide, u_y_guide, l_x_guide, l_y_guide, maxx_guide)
         b_r_ideal = self.generate_zigzag_raw(start_x_r, truss_rear_n + 1, 1, truss_angle, True, u_x_guide, u_y_guide, l_x_guide, l_y_guide, maxx_guide)
         blocks_r = [b_r_ideal] if b_r_ideal else []
         
@@ -934,6 +940,14 @@ class RibGeneratorEngine:
             if bolt2_dia > 0:
                 b_b2 = safe_buffer_obs(Point(c_b2), bolt2_dia/2.0 + margin_bolt)
                 if b_b2: active_obs_list.append(b_b2)
+            if spar_hole_dia > 0:
+                # 楕円穴ポリゴンを生成（margin_spar分膨らませる）
+                theta_c = np.linspace(0, 2 * np.pi, 100)
+                dh = spar_hole_dia
+                dv = spar_hole_dv if spar_hole_dv > 0 else dh
+                ellipse_m = np.column_stack((c_m[0] + dh/2*np.cos(theta_c), c_m[1] + dv/2*np.sin(theta_c)))
+                b_m = safe_buffer_obs(Polygon(ellipse_m), margin_spar)
+                if b_m: active_obs_list.append(b_m)
             if front_dia > 0:
                 b_f = safe_buffer_obs(Point(c_f), front_dia/2.0 + margin_spar)
                 if b_f: active_obs_list.append(b_f)
@@ -1202,7 +1216,7 @@ class RibGeneratorEngine:
                 warnings_list.append("Rib shape is invalid!")
 
         theta_c = np.linspace(0, 2 * np.pi, 100)
-        hole_m = np.column_stack((c_m[0] + spar_hole_dia/2*np.cos(theta_c), c_m[1] + spar_hole_dia/2*np.sin(theta_c))) if spar_hole_dia > 0 else []
+        hole_m = np.column_stack((c_m[0] + spar_hole_dia/2*np.cos(theta_c), c_m[1] + spar_hole_dv/2*np.sin(theta_c))) if spar_hole_dia > 0 else []
         hole_r = np.column_stack((c_r[0] + rear_dia/2*np.cos(theta_c), c_r[1] + rear_dia/2*np.sin(theta_c))) if rear_dia > 0 else []
         hole_f = np.column_stack((c_f[0] + front_dia/2*np.cos(theta_c), c_f[1] + front_dia/2*np.sin(theta_c))) if front_dia > 0 else []
         hole_b1 = np.column_stack((c_b1[0] + bolt1_dia/2*np.cos(theta_c), c_b1[1] + bolt1_dia/2*np.sin(theta_c))) if bolt1_dia > 0 else []
@@ -1224,10 +1238,11 @@ class RibGeneratorEngine:
         t = y_local / p['wing_span'] if p['wing_span'] > 0 else 0
         chord = p['chord_root'] * (1 - t) + p['chord_tip'] * t
         spar_pct = p['spar_pos_root'] * (1 - t) + p['spar_pos_tip'] * t
+        base_aoa = p.get('base_aoa', 0.0)
         washout_root = p.get('washout_root', 0.0)
         washout_tip = p.get('washout_tip', 0.0)
         washout_exp = p.get('washout_exp', 1.0)
-        washout = washout_root + (washout_tip - washout_root) * (t ** washout_exp)
+        washout = base_aoa + washout_root + (washout_tip - washout_root) * (t ** washout_exp)
         
         xb_t_list = []
         x_dia = 0.0
@@ -1277,7 +1292,7 @@ class RibGeneratorEngine:
 
         params_obj = RibParameters(
             file1=p['file1'], file2=p['file2'], blend_ratio=blend, chord=chord, spar_pct=spar_pct, washout_deg=washout,
-            spar_hole_dia=p['spar_hole_dia'], rear_dx=p['rear_spar_dx'], rear_dy=p['rear_spar_dy'], rear_dia=p['rear_spar_dia'],
+            spar_hole_dia=p['spar_hole_dia'], spar_hole_dv=p.get('spar_hole_dv', 0.0) or p['spar_hole_dia'], rear_dx=p['rear_spar_dx'], rear_dy=p['rear_spar_dy'], rear_dia=p['rear_spar_dia'],
             front_dx=p['front_spar_dx'], front_dy=p['front_spar_dy'], front_dia=p['front_spar_dia'],
             truss_angle=angle, truss_front_n=p['truss_front_n'], truss_rear_n=p['truss_rear_n'],
             beam_width=active_beam, margin_spar=p['margin_spar'], margin_bolt=p['margin_bolt'], margin_outer=active_margin,
@@ -1303,68 +1318,383 @@ class RibGeneratorEngine:
         
         return self.generate_single_rib(params_obj)
 
-    def export_dxf(self, filepath, origin, rib_pts, c_m, d_m, c_f, d_f, c_r, d_r, truss_holes, xb_centers, d_xb, plank_poly, te_part, c_b1, d_b1, hole_b1, c_b2, d_b2, hole_b2, diag_poly_pts_list, te_cap_pts_list=None, rc_cap_pts_list=None):
+    def export_dxf(self, filepath, origin, rib_pts, c_m, d_m, c_f, d_f, c_r, d_r, truss_holes, xb_centers, d_xb, plank_poly, te_part, c_b1, d_b1, hole_b1, c_b2, d_b2, hole_b2, diag_poly_pts_list, te_cap_pts_list=None, rc_cap_pts_list=None, jig_pts=None, doc=None, msp=None, offset=(0,0), layer_flags=None):
         if ezdxf is None: raise ImportError("ezdxf is required.")
-        doc = ezdxf.new('R2010')
-        msp = doc.modelspace()
-        
+        if layer_flags is None:
+            layer_flags = {}
+
+        save_required = False
+        if doc is None or msp is None:
+            doc = ezdxf.new('R2010')
+            msp = doc.modelspace()
+            save_required = True
+
         try:
             doc.layers.add(name='RIB_OUTLINE', color=7)
             doc.layers.add(name='HOLES', color=1)
             doc.layers.add(name='TRUSS', color=2)
             doc.layers.add(name='PLANK', color=3)
             doc.layers.add(name='TE_PART', color=4)
-        except AttributeError:
-            doc.layers.new(name='RIB_OUTLINE', dxfattribs={'color': 7})
-            doc.layers.new(name='HOLES', dxfattribs={'color': 1})
-            doc.layers.new(name='TRUSS', dxfattribs={'color': 2})
-            doc.layers.new(name='PLANK', dxfattribs={'color': 3})
-            doc.layers.new(name='TE_PART', dxfattribs={'color': 4})
-        
+            doc.layers.add(name='JIG_OUTLINE', color=5)
+            doc.layers.add(name='TE_CAPS', color=6)
+            doc.layers.add(name='RIB_CAPS', color=5)
+        except Exception:
+            try:
+                doc.layers.new(name='RIB_OUTLINE', dxfattribs={'color': 7})
+                doc.layers.new(name='HOLES', dxfattribs={'color': 1})
+                doc.layers.new(name='TRUSS', dxfattribs={'color': 2})
+                doc.layers.new(name='PLANK', dxfattribs={'color': 3})
+                doc.layers.new(name='TE_PART', dxfattribs={'color': 4})
+                doc.layers.new(name='JIG_OUTLINE', dxfattribs={'color': 5})
+                doc.layers.new(name='TE_CAPS', dxfattribs={'color': 6})
+                doc.layers.new(name='RIB_CAPS', dxfattribs={'color': 5})
+            except Exception:
+                pass
+
         origin_pt = np.array(origin)
-        def shift(p): return (float(p[0] - origin_pt[0]), float(p[1] - origin_pt[1]))
-        def shift_poly(poly): return [(float(pt[0] - origin_pt[0]), float(pt[1] - origin_pt[1])) for pt in poly]
+        def shift(p): return (float(p[0] - origin_pt[0] + offset[0]), float(p[1] - origin_pt[1] + offset[1]))
+        def shift_poly(poly): return [(float(pt[0] - origin_pt[0] + offset[0]), float(pt[1] - origin_pt[1] + offset[1])) for pt in poly]
+        
+        if layer_flags.get('dxf_layer_rib_outline', True):
+            if len(rib_pts) > 0: msp.add_lwpolyline(shift_poly(rib_pts), close=True, dxfattribs={'layer': 'RIB_OUTLINE'})
+        
+        if layer_flags.get('dxf_layer_holes', True):
+            if d_m > 0: msp.add_circle(center=shift(c_m), radius=d_m/2.0, dxfattribs={'layer': 'HOLES'})
+            if d_f > 0: msp.add_circle(center=shift(c_f), radius=d_f/2.0, dxfattribs={'layer': 'HOLES'})
+            if d_r > 0: msp.add_circle(center=shift(c_r), radius=d_r/2.0, dxfattribs={'layer': 'HOLES'})
+            if d_b1 > 0: msp.add_circle(center=shift(c_b1), radius=d_b1/2.0, dxfattribs={'layer': 'HOLES'})
+            if d_b2 > 0: msp.add_circle(center=shift(c_b2), radius=d_b2/2.0, dxfattribs={'layer': 'HOLES'})
+            for diag_poly_pts in diag_poly_pts_list:
+                if len(diag_poly_pts) > 0: msp.add_lwpolyline(shift_poly(diag_poly_pts), close=True, dxfattribs={'layer': 'HOLES'})
+
+        if layer_flags.get('dxf_layer_truss', True):
+            for c in xb_centers: msp.add_circle(center=shift(c), radius=d_xb/2.0, dxfattribs={'layer': 'TRUSS'})
+            for h in truss_holes: msp.add_lwpolyline(shift_poly(h), close=True, dxfattribs={'layer': 'TRUSS'})
+
+        if layer_flags.get('dxf_layer_plank', True):
+            if len(plank_poly) > 0: msp.add_lwpolyline(shift_poly(plank_poly), close=True, dxfattribs={'layer': 'PLANK'})
+
+        if layer_flags.get('dxf_layer_te_part', True):
+            if len(te_part) > 0: msp.add_lwpolyline(shift_poly(te_part), close=True, dxfattribs={'layer': 'TE_PART'})
+            if te_cap_pts_list is not None:
+                for cap_pts in te_cap_pts_list:
+                    if len(cap_pts) > 0: msp.add_lwpolyline(shift_poly(cap_pts), close=True, dxfattribs={'layer': 'TE_CAPS'})
+            if rc_cap_pts_list is not None:
+                for cap_pts in rc_cap_pts_list[0] + rc_cap_pts_list[1]:
+                    if len(cap_pts) > 0: msp.add_lwpolyline(shift_poly(cap_pts), close=True, dxfattribs={'layer': 'RIB_CAPS'})
+
+        if layer_flags.get('dxf_layer_jig_outline', True):
+            if jig_pts is not None and len(jig_pts) > 0: msp.add_lwpolyline(shift_poly(jig_pts), close=True, dxfattribs={'layer': 'JIG_OUTLINE'})
+
+        if save_required:
+            doc.saveas(filepath)
+
+    def export_single_poly_dxf(self, filepath, poly_pts, origin, doc=None, msp=None, offset=(0,0)):
+        if ezdxf is None: raise ImportError("ezdxf is required.")
+        
+        save_required = False
+        if doc is None or msp is None:
+            doc = ezdxf.new('R2010')
+            msp = doc.modelspace()
+            save_required = True
+
+        try:
+            doc.layers.add(name='OUTLINE', color=7)
+        except Exception:
+            try:
+                doc.layers.new(name='OUTLINE', dxfattribs={'color': 7})
+            except Exception:
+                pass
+
+        pts = []
+        for p in poly_pts:
+            pts.append((p[0] - origin[0] + offset[0], p[1] - origin[1] + offset[1]))
             
-        if len(rib_pts) > 0: msp.add_lwpolyline(shift_poly(rib_pts), close=True, dxfattribs={'layer': 'RIB_OUTLINE'})
-        if d_m > 0: msp.add_circle(center=shift(c_m), radius=d_m/2.0, dxfattribs={'layer': 'HOLES'})
-        if d_f > 0: msp.add_circle(center=shift(c_f), radius=d_f/2.0, dxfattribs={'layer': 'HOLES'})
-        if d_r > 0: msp.add_circle(center=shift(c_r), radius=d_r/2.0, dxfattribs={'layer': 'HOLES'})
-        if d_b1 > 0: msp.add_circle(center=shift(c_b1), radius=d_b1/2.0, dxfattribs={'layer': 'HOLES'})
-        if d_b2 > 0: msp.add_circle(center=shift(c_b2), radius=d_b2/2.0, dxfattribs={'layer': 'HOLES'})
-        for c in xb_centers: msp.add_circle(center=shift(c), radius=d_xb/2.0, dxfattribs={'layer': 'TRUSS'})
-        for h in truss_holes: msp.add_lwpolyline(shift_poly(h), close=True, dxfattribs={'layer': 'TRUSS'})
-        if len(plank_poly) > 0: msp.add_lwpolyline(shift_poly(plank_poly), close=True, dxfattribs={'layer': 'PLANK'})
-        if len(te_part) > 0: msp.add_lwpolyline(shift_poly(te_part), close=True, dxfattribs={'layer': 'TE_PART'})
-        for diag_poly_pts in diag_poly_pts_list:
-            if len(diag_poly_pts) > 0: msp.add_lwpolyline(shift_poly(diag_poly_pts), close=True, dxfattribs={'layer': 'HOLES'})
-            
-        if te_cap_pts_list is not None:
-            try: doc.layers.add(name='TE_CAPS', color=6)
-            except AttributeError: doc.layers.new(name='TE_CAPS', dxfattribs={'color': 6})
-            for cap_pts in te_cap_pts_list:
-                if len(cap_pts) > 0: msp.add_lwpolyline(shift_poly(cap_pts), close=True, dxfattribs={'layer': 'TE_CAPS'})
-            
-        if rc_cap_pts_list is not None:
-            try: doc.layers.add(name='RIB_CAPS', color=5)
-            except AttributeError: doc.layers.new(name='RIB_CAPS', dxfattribs={'color': 5})
-            for cap_pts in rc_cap_pts_list[0] + rc_cap_pts_list[1]:
-                if len(cap_pts) > 0: msp.add_lwpolyline(shift_poly(cap_pts), close=True, dxfattribs={'layer': 'RIB_CAPS'})
+        if len(pts) > 0:
+            msp.add_lwpolyline(pts, close=True, dxfattribs={'layer': 'OUTLINE'})
             
         doc.saveas(filepath)
-
-    def export_single_poly_dxf(self, filepath, poly_pts, origin):
-        if ezdxf is None: raise ImportError("ezdxf is required.")
-        doc = ezdxf.new('R2010')
-        msp = doc.modelspace()
+        
+    def generate_jig_at_y(self, p, y_local: float, return_full=False):
+        import numpy as np
+        from shapely.geometry import Polygon, box, Point, LineString
+        from shapely.ops import unary_union
+        
+        chord, spar_pct, washout, t, xb_t_list, x_dia = self.get_local_params(p, y_local)
+        
+        te_cut = p.get('te_cut', 0.0)
+        d_m = p.get('spar_hole_dia', 0.0)
+        dv_m = p.get('spar_hole_dv', 0.0)
+        d_r = p.get('rear_spar_dia', 0.0)
+        d_f = p.get('front_spar_dia', 0.0)
+        
+        front_dx = p.get('front_spar_dx', 0.0)
+        front_dy = p.get('front_spar_dy', 0.0)
+        rear_dx = p.get('rear_spar_dx', 0.0)
+        rear_dy = p.get('rear_spar_dy', 0.0)
         
         try:
-            doc.layers.add(name='PART', color=7)
-        except AttributeError:
-            doc.layers.new(name='PART', dxfattribs={'color': 7})
+            pts1 = self.load_dat(p.get('file1', ''))
+            pts2 = self.load_dat(p.get('file2', ''))
+            if len(pts1) == 0 or len(pts2) == 0:
+                print(f"Jig generation error at Y={y_local}: Missing valid dat files")
+                return None
+                
+            n_pts = 300
+            blended = self.resample_airfoil(pts1, n_pts) * (1.0 - t) + self.resample_airfoil(pts2, n_pts) * t
+            scaled = blended * chord
             
-        origin_pt = np.array(origin)
-        if len(poly_pts) > 0:
-            shifted_pts = poly_pts - origin_pt
-            msp.add_lwpolyline([(pt[0], pt[1]) for pt in shifted_pts], close=True, dxfattribs={'layer': 'PART'})
+            le_idx = np.argmin(scaled[:, 0])
+            u_x_orig, u_y_orig = scaled[:le_idx+1, 0][::-1], scaled[:le_idx+1, 1][::-1]
+            l_x_orig, l_y_orig = scaled[le_idx:, 0], scaled[le_idx:, 1]
+
+            spar_x = chord * (spar_pct / 100.0)
+            spar_y_pre = (np.interp(spar_x, u_x_orig, u_y_orig) + np.interp(spar_x, l_x_orig, l_y_orig)) / 2.0
+
+            w_theta = np.radians(washout)
+            R_mat = np.array([[np.cos(w_theta), -np.sin(w_theta)], [np.sin(w_theta), np.cos(w_theta)]])
+
+            rotated = (scaled - [spar_x, spar_y_pre]).dot(R_mat.T) + [spar_x, spar_y_pre]
+
+            le_idx = np.argmin(rotated[:, 0])
+            u_x, u_y = rotated[:le_idx+1, 0][::-1], rotated[:le_idx+1, 1][::-1]
+            l_x, l_y = rotated[le_idx:, 0], rotated[le_idx:, 1]
             
-        doc.saveas(filepath)
+            c_m = np.array([spar_x, spar_y_pre])
+            c_r = (np.array([spar_x + rear_dx, spar_y_pre + rear_dy]) - c_m).dot(R_mat.T) + c_m
+            c_f = (np.array([spar_x + front_dx, spar_y_pre + front_dy]) - c_m).dot(R_mat.T) + c_m
+            
+        except Exception as e:
+            print(f"Jig generation error at Y={y_local}: {e}")
+            return None
+
+        # Early calculation of TE coordinates
+        te_pad_width = te_cut + 10.0
+        unrot_end_x = chord
+        unrot_start_x = chord - te_pad_width
+        
+        pad_x_orig = []
+        pad_y_orig = []
+        sort_idx = np.argsort(l_x_orig)
+        l_x_sorted = np.array(l_x_orig)[sort_idx]
+        l_y_sorted = np.array(l_y_orig)[sort_idx]
+        
+        pad_x_orig.append(unrot_start_x)
+        pad_y_orig.append(np.interp(unrot_start_x, l_x_sorted, l_y_sorted))
+        for xi, yi in zip(l_x_sorted, l_y_sorted):
+            if unrot_start_x < xi < unrot_end_x:
+                pad_x_orig.append(xi)
+                pad_y_orig.append(yi)
+        pad_x_orig.append(unrot_end_x)
+        pad_y_orig.append(np.interp(unrot_end_x, l_x_sorted, l_y_sorted))
+        
+        pad_pts_orig = np.column_stack((pad_x_orig, pad_y_orig))
+        rotated_pad_pts = (pad_pts_orig - [spar_x, spar_y_pre]).dot(R_mat.T) + [spar_x, spar_y_pre]
+        
+        te_x_arr = rotated_pad_pts[:, 0]
+        te_y_arr = rotated_pad_pts[:, 1]
+        
+        # Calculate Base Y
+        base_height = float(p.get('jig_base_height', 100.0))
+        base_y = c_m[1] - base_height
+        jig_wall_thickness = float(p.get('jig_wall_thickness', 10.0))
+        
+        # Calculate Stopper End X
+        stopper_height = float(p.get('jig_te_stopper_height', 10.0))
+        if stopper_height > 0:
+            stopper_back_x = te_x_arr[-1] + jig_wall_thickness
+        else:
+            stopper_back_x = te_x_arr[-1]
+            
+        # Calculate Slot Centers based on the smallest rib's chordwise midpoint
+        chord_root = float(p.get('chord_root', 200.0))
+        chord_tip = float(p.get('chord_tip', 200.0))
+        if chord_tip <= chord_root:
+            min_chord = chord_tip
+            spar_pos_min = float(p.get('spar_pos_tip', 30.0))
+        else:
+            min_chord = chord_root
+            spar_pos_min = float(p.get('spar_pos_root', 30.0))
+            
+        spar_x_min = min_chord * spar_pos_min / 100.0
+        slot_center_from_le_min = min_chord / 2.0
+        slot_offset_from_spar = slot_center_from_le_min - spar_x_min
+        
+        slot_center_x = c_m[0] + slot_offset_from_spar
+        
+        slot_interval = float(p.get('jig_slot_interval', 100.0))
+        slot_width = float(p.get('jig_slot_width', 3.0))
+        slot_depth = float(p.get('jig_slot_depth', 10.0))
+        slot1_x = slot_center_x - slot_interval / 2.0
+        slot2_x = slot_center_x + slot_interval / 2.0
+        
+        # Define base limits
+        front_pillar_left = (c_f[0] - d_f/2.0) - jig_wall_thickness if d_f > 0 else (c_m[0] - d_m/2.0) - jig_wall_thickness
+        slot1_left = slot1_x - slot_width / 2.0
+        base_start_x = min(front_pillar_left, slot1_left - jig_wall_thickness)
+
+        # User constraint: jig ends at trailing edge support, unless slot2 extends further
+        slot2_right = slot2_x + slot_width / 2.0
+        base_end_x = max(stopper_back_x, slot2_right + jig_wall_thickness)
+        
+        # Create base poly
+        base_thickness = float(p.get('jig_base_thickness', 25.0))
+        base_poly = box(base_start_x, base_y, base_end_x, base_y + base_thickness)
+        
+        angle_deg = float(p.get('jig_pillar_angle', 90.0))
+        clearances = []
+        
+        # Helper to create a trapezoidal pillar for a spar
+        def create_pillar(c, d, dv=None):
+            if dv is None or dv <= 0: dv = d
+            box_w = d + 2.0 * jig_wall_thickness
+            box_top_y = c[1] + dv * 0.1
+            
+            box_left = c[0] - box_w / 2.0
+            box_right = c[0] + box_w / 2.0
+            
+            # Pillar polygon
+            dy_down = box_top_y - (base_y + base_thickness)
+            if angle_deg < 90.0 and dy_down > 0:
+                dx_down = dy_down / np.tan(np.radians(angle_deg))
+            else:
+                dx_down = 0.0
+                
+            pillar_pts = [
+                (box_left, box_top_y),
+                (box_right, box_top_y),
+                (box_right + dx_down, base_y + base_thickness),
+                (box_right + dx_down, base_y),
+                (box_left - dx_down, base_y),
+                (box_left - dx_down, base_y + base_thickness),
+            ]
+            
+            # Clearance polygon to subtract from thick base_poly
+            y_top = base_y + max(base_thickness, 1000.0)
+            dy_up = y_top - box_top_y
+            if angle_deg < 90.0 and dy_up > 0:
+                dx_up = dy_up / np.tan(np.radians(angle_deg))
+            else:
+                dx_up = 0.0
+                
+            clearance_pts = [
+                (box_left - dx_up, y_top),
+                (box_left, box_top_y),
+                (box_right, box_top_y),
+                (box_right + dx_up, y_top),
+                (box_right + dx_up, y_top + 1000.0),
+                (box_left - dx_up, y_top + 1000.0)
+            ]
+            clearances.append(Polygon(clearance_pts))
+            
+            return Polygon(pillar_pts)
+        
+        # Create Solid Pillars
+        pillars = []
+        if d_f > 0: pillars.append(create_pillar(c_f, d_f))
+        if d_m > 0: pillars.append(create_pillar(c_m, d_m, dv_m))
+        if d_r > 0: pillars.append(create_pillar(c_r, d_r))
+        
+        frame = unary_union(pillars) if pillars else Polygon()
+        
+        if len(te_x_arr) >= 2:
+            # TE solid block from base up to the tracing curve
+            te_block_pts = [(te_x_arr[0], base_y)]
+            te_block_pts.extend(list(zip(te_x_arr, te_y_arr)))
+            te_block_pts.append((te_x_arr[-1], base_y))
+            te_block_pts.append((te_x_arr[0], base_y)) # Close
+            te_block = Polygon(te_block_pts).buffer(0)
+            frame = frame.union(te_block)
+            
+            # Add TE Stopper wall
+            if stopper_height > 0:
+                stopper_front_x = te_x_arr[-1]
+                stopper_top_y = te_y_arr[-1] + stopper_height
+                stopper_poly = box(stopper_front_x, base_y, stopper_back_x, stopper_top_y)
+                frame = frame.union(stopper_poly)
+                
+            # TE Clearance logic to prevent thick base bar from burying TE support
+            y_top = base_y + max(base_thickness, 1000.0)
+            dy_up_te = y_top - te_y_arr[0]
+            if angle_deg < 90.0 and dy_up_te > 0:
+                dx_up_te = dy_up_te / np.tan(np.radians(angle_deg))
+            else:
+                dx_up_te = 0.0
+                
+            te_clearance_pts = [(te_x_arr[0] - dx_up_te, y_top), (te_x_arr[0], te_y_arr[0])]
+            te_clearance_pts.extend(list(zip(te_x_arr, te_y_arr)))
+            
+            if stopper_height > 0:
+                dy_up_stopper = y_top - stopper_top_y
+                if angle_deg < 90.0 and dy_up_stopper > 0:
+                    dx_up_stopper = dy_up_stopper / np.tan(np.radians(angle_deg))
+                else:
+                    dx_up_stopper = 0.0
+                
+                te_clearance_pts.append((stopper_front_x, stopper_top_y))
+                te_clearance_pts.append((stopper_back_x, stopper_top_y))
+                te_clearance_pts.append((stopper_back_x + dx_up_stopper, y_top))
+            else:
+                dy_up_te_right = y_top - te_y_arr[-1]
+                if angle_deg < 90.0 and dy_up_te_right > 0:
+                    dx_up_te_right = dy_up_te_right / np.tan(np.radians(angle_deg))
+                else:
+                    dx_up_te_right = 0.0
+                te_clearance_pts.append((te_x_arr[-1] + dx_up_te_right, y_top))
+                
+            te_clearance_pts.append((te_x_arr[0] - dx_up_te, y_top)) # close
+            te_clearance_poly = Polygon(te_clearance_pts).buffer(0)
+            clearances.append(te_clearance_poly)
+            
+        # Now that ALL clearances (pillars + TE) are collected, process the base
+        if clearances:
+            base_poly = base_poly.difference(unary_union(clearances))
+            
+        # Union with solid base
+        frame = frame.union(base_poly)
+            
+        # Cut spar holes (Rectangular boxes, width d, bottom at c_y - d/2)
+        if d_f > 0:
+            f_cut = box(c_f[0] - d_f/2.0, c_f[1] - d_f/2.0, c_f[0] + d_f/2.0, c_f[1] + d_f)
+            frame = frame.difference(f_cut)
+            
+        if d_m > 0:
+            dv = dv_m if dv_m > 0 else d_m
+            m_cut = box(c_m[0] - d_m/2.0, c_m[1] - dv/2.0, c_m[0] + d_m/2.0, c_m[1] + dv)
+            frame = frame.difference(m_cut)
+            
+        if d_r > 0:
+            r_cut = box(c_r[0] - d_r/2.0, c_r[1] - d_r/2.0, c_r[0] + d_r/2.0, c_r[1] + d_r)
+            frame = frame.difference(r_cut)
+            
+        # Slots on the base plate
+        s1 = box(slot1_x - slot_width/2.0, base_y - 1.0, slot1_x + slot_width/2.0, base_y + slot_depth)
+        s2 = box(slot2_x - slot_width/2.0, base_y - 1.0, slot2_x + slot_width/2.0, base_y + slot_depth)
+        frame = frame.difference(s1.union(s2))
+
+        # Extract polygon coordinates
+        jig_pts = None
+        if getattr(frame, 'geom_type', '') == 'Polygon':
+            jig_pts = list(frame.exterior.coords)
+        elif getattr(frame, 'geom_type', '') == 'MultiPolygon':
+            largest = max(frame.geoms, key=lambda a: a.area)
+            jig_pts = list(largest.exterior.coords)
+        elif getattr(frame, 'geom_type', '') == 'GeometryCollection':
+            polys = [g for g in frame.geoms if getattr(g, 'geom_type', '') == 'Polygon']
+            if polys:
+                largest = max(polys, key=lambda a: a.area)
+                jig_pts = list(largest.exterior.coords)
+            
+        if return_full:
+            return {
+                'jig_pts': jig_pts,
+                'wing_pts': rotated.tolist(),
+                'c_m': c_m.tolist(),
+                'd_m': d_m,
+                'dv_m': dv_m,
+                'c_f': c_f.tolist(),
+                'd_f': d_f,
+                'c_r': c_r.tolist(),
+                'd_r': d_r
+            }
+        return jig_pts

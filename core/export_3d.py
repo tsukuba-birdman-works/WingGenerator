@@ -13,7 +13,7 @@ class Wing3DBuilder:
         3Dジオメトリデータを収集する共通処理。
         戻り値: (scene_rib_data, other_meshes, part_colors, rib_orig_pts_list, te_span_mm)
         """
-        from .materials import AVAILABLE_MATERIALS
+        from .materials import AVAILABLE_MATERIALS, MATERIAL_PBR_PROPERTIES
 
         scene_rib_data = []
         main_spar_centers, front_spar_centers, rear_spar_centers = [], [], []
@@ -106,8 +106,10 @@ class Wing3DBuilder:
         # 3. 各パーツのメッシュを生成
         if self.p['joint_length'] > 0: main_spar_centers.insert(0, [0.0, 0.0, 0.0])
         if self.p['export_main_spar']:
-            inner = self.p.get('main_spar_inner_dia', self.p['spar_hole_dia'] - 2.0) / 2.0
-            other_meshes["Main_Spar"] = Wing3DExporter.generate_pipe_mesh(main_spar_centers, self.p['spar_hole_dia'] / 2.0, inner)
+            dh, dv = self.p['spar_hole_dia'], self.p.get('spar_hole_dv', 0.0)
+            if dv <= 0: dv = dh
+            inner = self.p.get('main_spar_inner_dia', dh - 2.0)
+            other_meshes["Main_Spar"] = Wing3DExporter.generate_pipe_mesh(main_spar_centers, (dh / 2.0, dv / 2.0), (inner / 2.0, inner / 2.0))
         if self.p['export_front_spar']:
             inner = self.p.get('front_spar_inner_dia', self.p['front_spar_dia'] - 2.0) / 2.0
             other_meshes["Front_Spar"] = Wing3DExporter.generate_pipe_mesh(front_spar_centers, self.p['front_spar_dia'] / 2.0, inner)
@@ -127,23 +129,33 @@ class Wing3DBuilder:
         if self.p['export_connectors']: self._generate_connector_meshes(other_meshes, main_spar_centers, rear_spar_centers)
         if self.p['export_diag_spars']: self._generate_diag_spar_meshes(other_meshes, main_spar_centers, rear_spar_centers)
         if self.p['export_xbrace_wires']: self._generate_xbrace_meshes(other_meshes, rear_spar_centers)
+        if self.p.get('export_joint_sleeves', True): self._generate_joint_sleeves(other_meshes)
 
         # 4. 色情報を定義
+        def get_mat_props(mat_key, default_rgba=[200, 200, 200, 255]):
+            mat_name = self.p.get(mat_key, '')
+            rgba = AVAILABLE_MATERIALS.get(mat_name, default_rgba)
+            pbr = MATERIAL_PBR_PROPERTIES.get(mat_name, (0.1, 0.5)) # default metallic, roughness
+            return (rgba, pbr[0], pbr[1])
+
         part_colors = {
-            'Ribs': AVAILABLE_MATERIALS.get(self.p['mat_ribs'], [200, 200, 200, 255]),
-            'Main_Spar': AVAILABLE_MATERIALS.get(self.p['mat_main_spar'], [200, 200, 200, 255]),
-            'Front_Spar': AVAILABLE_MATERIALS.get(self.p['mat_front_spar'], [200, 200, 200, 255]),
-            'Rear_Spar': AVAILABLE_MATERIALS.get(self.p['mat_rear_spar'], [200, 200, 200, 255]),
-            'Plank_Skin': AVAILABLE_MATERIALS.get(self.p['mat_plank'], [200, 200, 200, 255]),
-            'TE_Skin': AVAILABLE_MATERIALS.get(self.p['mat_te'], [200, 200, 200, 255]),
-            'Connector': AVAILABLE_MATERIALS.get(self.p['mat_connectors'], [200, 200, 200, 255]),
-            'Stringer': AVAILABLE_MATERIALS.get(self.p['mat_stringers'], [200, 200, 200, 255]),
-            'XBraceWire': AVAILABLE_MATERIALS.get(self.p['mat_xbrace_wires'], [200, 200, 200, 255]),
-            'Diag_Spar': AVAILABLE_MATERIALS.get(self.p['mat_diag_spars'], [30, 30, 30, 255]),
-            'CarbonRibs': AVAILABLE_MATERIALS.get(self.p['mat_carbon_ribs'], [30, 30, 30, 255]),
-            'TE_Cap': AVAILABLE_MATERIALS.get(self.p['mat_te_caps'], [30, 30, 30, 255]),
-            'Rib_Cap': AVAILABLE_MATERIALS.get(self.p['mat_rib_caps'], [30, 30, 30, 255]),
-            'Film_Skin': AVAILABLE_MATERIALS.get(self.p['mat_film'], [250, 250, 255, 80])
+            'Ribs': get_mat_props('mat_ribs'),
+            'Main_Spar': get_mat_props('mat_main_spar', [30,30,30,255]),
+            'Front_Spar': get_mat_props('mat_front_spar', [30,30,30,255]),
+            'Rear_Spar': get_mat_props('mat_rear_spar', [30,30,30,255]),
+            'Plank_Skin': get_mat_props('mat_plank'),
+            'TE_Skin': get_mat_props('mat_te'),
+            'Connector': get_mat_props('mat_connectors', [30,30,30,255]),
+            'Stringer': get_mat_props('mat_stringers'),
+            'XBraceWire': get_mat_props('mat_xbrace_wires'),
+            'Diag_Spar': get_mat_props('mat_diag_spars', [30,30,30,255]),
+            'CarbonRibs': get_mat_props('mat_carbon_ribs', [30,30,30,255]),
+            'TE_Cap': get_mat_props('mat_te_caps', [30,30,30,255]),
+            'Rib_Cap': get_mat_props('mat_rib_caps', [30,30,30,255]),
+            'JointSleeve_Cap': get_mat_props('mat_js_cap', [30, 30, 30, 255]),
+            'JointSleeve_Foam': get_mat_props('mat_js_foam', [100, 100, 255, 255]),
+            'JointSleeve_Skin': get_mat_props('mat_js_skin', [30, 30, 30, 255]),
+            'Film_Skin': get_mat_props('mat_film', [250, 250, 255, 80])
         }
 
         te_span_mm = self.p.get('wing_span', 0.0)
@@ -165,7 +177,7 @@ class Wing3DBuilder:
         """
         scene_rib_data, other_meshes, part_colors, rib_orig_pts_list, te_span_mm = self._collect_geometry_data()
         is_left = self.p['wing_type'] == "Left"
-        rib_data_to_export = [d for d in scene_rib_data if d[-1] != 'Ribs' or self.p['export_ribs']]
+        rib_data_to_export = [d for d in scene_rib_data if d[-1] != 'Ribs' or self.p.get('export_ribs', True)]
 
         scene_geoms = Wing3DExporter.build_scene_geoms(
             rib_data_to_export, other_meshes, is_left_wing=is_left, part_colors=part_colors
@@ -198,7 +210,7 @@ class Wing3DBuilder:
         import trimesh
         scene_rib_data, other_meshes, part_colors, _rib_orig, _te_span = self._collect_geometry_data()
         is_left = self.p['wing_type'] == "Left"
-        rib_data_to_export = [d for d in scene_rib_data if d[-1] != 'Ribs' or self.p['export_ribs']]
+        rib_data_to_export = [d for d in scene_rib_data if d[-1] != 'Ribs' or self.p.get('export_ribs', True)]
         Wing3DExporter.export_3d_scene(filepath, rib_data_to_export, other_meshes, is_left_wing=is_left, part_colors=part_colors)
 
     def _generate_rib_at_y(self, y_local, rib_index, thickness, is_carbon=False, te_cut_override=None):
@@ -242,7 +254,7 @@ class Wing3DBuilder:
             if conn_type.startswith("V-Shape"):
                 offset = r_conn
                 # default to inner=up if just "V-Shape" (old saves)
-                inner_goes_up = True if conn_type == "V-Shape" else ("In=Up" in conn_type)
+                inner_goes_up = True if conn_type == "V-Shape" else ("In=Up" in conn_type or "In-up" in conn_type or "Out-down" in conn_type)
                 
                 y_inner = y_c - offset
                 y_outer = y_c + offset
@@ -406,6 +418,64 @@ class Wing3DBuilder:
             meshes[f"XBraceWire_{wire_idx}"] = Wing3DExporter.generate_swept_mesh([p_m1, p_c1], wire_radius); wire_idx += 1
             meshes[f"XBraceWire_{wire_idx}"] = Wing3DExporter.generate_swept_mesh([p_c2, p_m2], wire_radius); wire_idx += 1
 
+    def _generate_joint_sleeves(self, meshes):
+        joint_sleeves = self.p.get('joint_sleeves', [])
+        if not joint_sleeves: return
+
+        import trimesh
+        import numpy as np
+
+        R_in = self.p['spar_hole_dia'] / 2.0
+
+        for i, js in enumerate(joint_sleeves):
+            y_start = js['start']
+            y_end = js['end']
+            if y_start >= y_end:
+                y_start, y_end = y_end, y_start
+            
+            L = y_end - y_start
+            if L <= 0: continue
+
+            R_out = js['out_dia'] / 2.0
+            t1 = js['t1']
+            t2 = js['t2']
+
+            if R_out <= R_in: continue
+
+            # helper to create and place annulus
+            def place_annulus(r_min, r_max, height, z_center):
+                if r_max <= r_min or height <= 0: return None
+                try:
+                    mesh = trimesh.creation.annulus(r_min=r_min, r_max=r_max, height=height)
+                    # annulus is created along Z-axis. Rotate it to align with Y-axis
+                    rot = trimesh.transformations.rotation_matrix(np.pi/2, [1, 0, 0])
+                    mesh.apply_transform(rot)
+                    # translation
+                    trans = trimesh.transformations.translation_matrix([0, z_center, 0])
+                    mesh.apply_transform(trans)
+                    return mesh
+                except Exception as e:
+                    print("Error creating joint sleeve part:", e)
+                    return None
+
+            # 1. Skin (Outer cylinder)
+            skin_mesh = place_annulus(R_out - t2, R_out, L, (y_start + y_end) / 2.0)
+            if skin_mesh: meshes[f"JointSleeve_Skin_{i}"] = skin_mesh
+
+            # 2. Caps (CFRP Plates)
+            if t1 > 0:
+                cap_s = place_annulus(R_in, R_out, t1, y_start + t1 / 2.0)
+                if cap_s: meshes[f"JointSleeve_CapS_{i}"] = cap_s
+                
+                cap_e = place_annulus(R_in, R_out, t1, y_end - t1 / 2.0)
+                if cap_e: meshes[f"JointSleeve_CapE_{i}"] = cap_e
+
+            # 3. Foam (Core)
+            foam_L = L - 2 * t1
+            if foam_L > 0 and R_out - t2 > R_in:
+                foam_mesh = place_annulus(R_in, R_out - t2, foam_L, (y_start + y_end) / 2.0)
+                if foam_mesh: meshes[f"JointSleeve_Foam_{i}"] = foam_mesh
+
     def _to_rel(self, pts, c_m):
         return np.array(pts) - c_m if pts is not None and len(pts) > 0 else []
 
@@ -425,7 +495,8 @@ class Wing3DExporter:
             raise ImportError("trimesh and shapely are required for 3D export.")
 
         if other_meshes is None: other_meshes = {}
-        if part_colors is None: part_colors = {}
+        if part_colors is None:
+            part_colors = {}
         meshes = []
         last_err = ""
 
@@ -474,30 +545,35 @@ class Wing3DExporter:
         except ImportError:
             PBRMaterial = None
 
-        def apply_color(mesh_obj, color_rgba):
+        def apply_color(mesh_obj, color_props):
+            if isinstance(color_props, tuple) and len(color_props) == 3:
+                color_rgba, metallic, roughness = color_props
+            else:
+                color_rgba, metallic, roughness = color_props, 0.1, 0.5
+
             mesh_obj.visual.face_colors = color_rgba
             if PBRMaterial:
                 a_mode = 'BLEND' if color_rgba[3] < 255 else 'OPAQUE'
-                mesh_obj.visual.material = PBRMaterial(baseColorFactor=color_rgba, doubleSided=True, alphaMode=a_mode)
+                mesh_obj.visual.material = PBRMaterial(baseColorFactor=color_rgba, metallicFactor=metallic, roughnessFactor=roughness, doubleSided=True, alphaMode=a_mode)
 
         ribs_m_list = [m for m, k in meshes if k == 'Ribs']
         if ribs_m_list:
             ribs_mesh = trimesh.util.concatenate(ribs_m_list)
-            c = part_colors.get('Ribs', [200, 200, 200, 255])
+            c = part_colors.get('Ribs', ([200, 200, 200, 255], 0.1, 0.5))
             apply_color(ribs_mesh, c)
             scene_geoms['Ribs'] = ribs_mesh
 
         carbon_m_list = [m for m, k in meshes if k == 'CarbonRibs']
         if carbon_m_list:
             cr_mesh = trimesh.util.concatenate(carbon_m_list)
-            c = part_colors.get('CarbonRibs', [30, 30, 30, 255])
+            c = part_colors.get('CarbonRibs', ([30, 30, 30, 255], 0.2, 0.1))
             apply_color(cr_mesh, c)
             scene_geoms['CarbonRibs'] = cr_mesh
 
         rc_m_list = [m for m, k in meshes if k == 'Rib_Cap']
         if rc_m_list:
             rc_mesh = trimesh.util.concatenate(rc_m_list)
-            c = part_colors.get('Rib_Cap', [30, 30, 30, 255])
+            c = part_colors.get('Rib_Cap', ([30, 30, 30, 255], 0.2, 0.1))
             apply_color(rc_mesh, c)
             scene_geoms['Rib_Cap'] = rc_mesh
 
@@ -568,10 +644,23 @@ class Wing3DExporter:
     def export_3d_scene(filepath, rib_data_list, other_meshes=None, is_left_wing=False, part_colors=None):
         """build_scene_geomsでジオメトリを構築したのちファイルに書き出す"""
         import trimesh
+        import os
+        import numpy as np
         scene_geoms = Wing3DExporter.build_scene_geoms(
             rib_data_list, other_meshes, is_left_wing=is_left_wing, part_colors=part_colors
         )
         scene = trimesh.Scene(geometry=scene_geoms)
+
+        # GLTF/GLB formats strictly require units in meters. Since Ribgenerator uses mm,
+        # we scale the scene by 0.001 to convert mm to meters before exporting to glb.
+        ext = os.path.splitext(filepath)[1].lower()
+        if ext in ['.glb', '.gltf']:
+            scale_matrix = np.eye(4)
+            scale_matrix[0, 0] = 0.001
+            scale_matrix[1, 1] = 0.001
+            scale_matrix[2, 2] = 0.001
+            scene.apply_transform(scale_matrix)
+
         scene.export(filepath)
 
     @staticmethod
@@ -602,7 +691,10 @@ class Wing3DExporter:
         指定された3D点の経路に沿って、端が閉じていない中空のパイプメッシュを生成します。
         ブーリアン演算を使用せずに、頂点と面から直接メッシュを構築します。
         """
-        if len(points_3d) < 2 or outer_radius <= inner_radius or inner_radius < 0:
+        rx_out, ry_out = outer_radius if isinstance(outer_radius, tuple) else (outer_radius, outer_radius)
+        rx_in, ry_in = inner_radius if isinstance(inner_radius, tuple) else (inner_radius, inner_radius)
+        
+        if len(points_3d) < 2 or rx_out <= rx_in or ry_out <= ry_in or rx_in < 0 or ry_in < 0:
             return None
         try:
             import trimesh
@@ -631,8 +723,8 @@ class Wing3DExporter:
                 for j in range(sections):
                     angle = 2 * np.pi * j / sections
                     # 外側と内側の頂点を追加
-                    vertices.append(p1 + outer_radius * (np.cos(angle) * u + np.sin(angle) * v))
-                    vertices.append(p1 + inner_radius * (np.cos(angle) * u + np.sin(angle) * v))
+                    vertices.append(p1 + rx_out * np.cos(angle) * u + ry_out * np.sin(angle) * v)
+                    vertices.append(p1 + rx_in * np.cos(angle) * u + ry_in * np.sin(angle) * v)
 
             faces = []
             # パイプの側面（外側と内側）の面を生成
@@ -742,19 +834,19 @@ class Wing3DExporter:
             
             valid_curves = [c for c in curves_3d if len(c) >= 3]
             if len(valid_curves) < 2: return None
-            
+
+            # Ensure all curves are closed beforehand to determine true max_len
+            for i in range(len(valid_curves)):
+                if np.linalg.norm(valid_curves[i][0] - valid_curves[i][-1]) > 1e-5:
+                    valid_curves[i] = np.vstack([valid_curves[i], valid_curves[i][0]])
+                    
             max_len = max(len(c) for c in valid_curves)
-            
+
             def resample_closed(curve, n):
-                if np.linalg.norm(curve[0] - curve[-1]) > 1e-5:
-                    curve = np.vstack([curve, curve[0]])
                 dist = np.cumsum(np.linalg.norm(np.diff(curve, axis=0), axis=1))
                 dist = np.insert(dist, 0, 0)
                 if dist[-1] == 0: return np.tile(curve[0], (n, 1))
-                
                 target = np.linspace(0, dist[-1], n)
-                
-                # 鋭角の角を検出して保護する（面取り防止）
                 corners = []
                 for i in range(1, len(curve)-1):
                     v1 = curve[i] - curve[i-1]
@@ -763,13 +855,14 @@ class Wing3DExporter:
                     n2 = np.linalg.norm(v2)
                     if n1 > 1e-5 and n2 > 1e-5:
                         cos_th = np.clip(np.dot(v1, v2) / (n1 * n2), -1.0, 1.0)
-                        if np.arccos(cos_th) > 0.5: # 約28度以上の折れ曲がり
+                        if np.arccos(cos_th) > 0.5:
                             corners.append(dist[i])
                 
                 for c_dist in corners:
                     idx = np.argmin(np.abs(target - c_dist))
-                    if idx > 0 and c_dist <= target[idx-1]: continue
-                    if idx < n - 1 and c_dist >= target[idx+1]: continue
+                    if idx == 0 or idx == n - 1: continue
+                    if c_dist <= target[idx-1]: continue
+                    if c_dist >= target[idx+1]: continue
                     target[idx] = c_dist
                     
                 return np.array([np.interp(target, dist, curve[:, i]) for i in range(3)]).T
