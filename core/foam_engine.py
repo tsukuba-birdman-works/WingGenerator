@@ -302,8 +302,8 @@ class FoamCutterEngine:
         pts1 = self._shift_path(self._resample_points(pts1, max_pts, smooth=smooth_curves), shift_pct)
         pts2 = self._shift_path(self._resample_points(pts2, max_pts, smooth=smooth_curves), shift_pct)
 
-        pts1 = self._apply_kerf_offset(pts1, kerf)
-        pts2 = self._apply_kerf_offset(pts2, kerf)
+        pts1 = self._apply_kerf_offset(pts1, -kerf if reverse_path else kerf)
+        pts2 = self._apply_kerf_offset(pts2, -kerf if reverse_path else kerf)
         margin = (wire_l - block_w) / 2.0
         
         xy_traj, az_traj = [], []

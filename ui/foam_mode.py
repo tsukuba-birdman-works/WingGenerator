@@ -41,7 +41,7 @@ class FoamCutterGUI:
         self.axis_rh = tk.StringVar(value="A")
         self.axis_rv = tk.StringVar(value="Z")
         
-        self.spindle_mode = tk.StringVar(value="M4 (Dynamic/Laser)")
+        self.spindle_mode = tk.StringVar(value="M3")
         self.s_value = tk.DoubleVar(value=83.0) 
 
         self.wing_type = tk.StringVar(value=wing_type if wing_type else "Right")

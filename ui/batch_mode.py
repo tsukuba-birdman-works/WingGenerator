@@ -114,9 +114,9 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             'truss_angles_dict': getattr(self, 'truss_angles_dict', {}), 'stringers_data': getattr(self, 'get_stringers_data', lambda: [])(),
             'wing_type': getattr(self, 'wing_type', tk.StringVar(value="Linear")).get(),
             'wing_name': wing_name,
-            **{k: self.safe_float(getattr(self, k)) for k in ['joint_length', 'wing_span', 'chord_root', 'chord_tip', 'spar_pos_root', 'spar_pos_tip', 'washout_root', 'washout_tip', 'base_aoa', 'spar_hole_dia', 'spar_hole_dv', 'front_spar_dx', 'front_spar_dy', 'front_spar_dia', 'rear_spar_dx', 'rear_spar_dy', 'rear_spar_dia', 'plank_start', 'plank_end', 'plank_thick', 'plank_part_start', 'plank_part_end', 'te_cut', 'beam_width', 'edge_beam_width', 'margin_spar', 'margin_bolt', 'margin_outer', 'margin_outer_edge', 'base_truss_angle', 'truss_fillet', 'min_hole_dia', 'xbrace_dia', 'xbrace_wire_dia', 'xbrace_offset', 'rib_thick', 'cr_thick', 'te_cap_thick', 'rc1_start', 'rc1_end', 'rc1_thick', 'rc1_width', 'rc2_start', 'rc2_end', 'rc2_thick', 'rc2_width'] if hasattr(self, k)},
+            **{k: self.safe_float(getattr(self, k)) for k in ['joint_length', 'wing_span', 'chord_root', 'chord_tip', 'spar_pos_root', 'spar_pos_tip', 'washout_root', 'washout_tip', 'base_aoa', 'spar_hole_dia', 'spar_hole_dv', 'front_spar_dx', 'front_spar_dy', 'front_spar_dia', 'rear_spar_dx', 'rear_spar_dy', 'rear_spar_dia', 'plank_start', 'plank_end', 'plank_thick', 'plank_part_start', 'plank_part_end', 'te_cut', 'beam_width', 'edge_beam_width', 'margin_spar', 'margin_bolt', 'margin_outer', 'margin_outer_edge', 'base_truss_angle', 'truss_fillet', 'min_hole_dia', 'xbrace_dia', 'xbrace_wire_dia', 'xbrace_offset', 'rib_thick', 'cr_thick', 'te_cap_thick', 'rc1_start', 'rc1_end', 'rc1_thick', 'rc1_width', 'rc2_start', 'rc2_end', 'rc2_thick', 'rc2_width', 'le_interp_range', 'le_interp_divisions'] if hasattr(self, k)},
             **{k: self.safe_int(getattr(self, k)) for k in ['truss_front_n', 'truss_rear_n'] if hasattr(self, k)},
-            **{k: self.pm.vars[k].get() for k in ['safe_margin_var', 'te_cap_uf_act', 'te_cap_lf_act', 'te_cap_ur_act', 'te_cap_lr_act', 'rc1_act', 'rc2_act', 'diag1_active', 'diag2_active', 'jig_y_positions', 'jig_base_height', 'jig_base_thickness', 'jig_wall_thickness', 'jig_pillar_angle', 'jig_te_stopper_height', 'jig_slot_interval', 'jig_slot_width', 'jig_slot_depth', 'dxf_layer_rib_outline', 'dxf_layer_holes', 'dxf_layer_truss', 'dxf_layer_plank', 'dxf_layer_te_part', 'dxf_layer_jig_outline', 'dxf_all_in_one'] if k in self.pm.vars},
+            **{k: self.pm.vars[k].get() for k in ['safe_margin_var', 'te_cap_uf_act', 'te_cap_lf_act', 'te_cap_ur_act', 'te_cap_lr_act', 'rc1_act', 'rc2_act', 'diag1_active', 'diag2_active', 'jig_y_positions', 'jig_base_height', 'jig_base_thickness', 'jig_wall_thickness', 'jig_pillar_angle', 'jig_te_stopper_height', 'jig_slot_interval', 'jig_slot_width', 'jig_slot_depth', 'dxf_layer_rib_outline', 'dxf_layer_holes', 'dxf_layer_truss', 'dxf_layer_plank', 'dxf_layer_te_part', 'dxf_layer_jig_outline', 'dxf_all_in_one', 'le_interp_active'] if k in self.pm.vars},
             'dxf_selections': {k: v.get() for k, v in getattr(self, 'dxf_selection_vars', {}).items()},
             **{k: getattr(self, k).get() for k in ['export_main_spar', 'export_front_spar', 'export_rear_spar', 'export_plank', 'export_te', 'export_connectors', 'export_stringers', 'export_xbrace_wires', 'export_diag_spars', 'export_carbon_ribs', 'export_te_caps', 'export_rib_caps', 'export_film', 'export_joint_sleeves'] if hasattr(self, k)},
             **{f'mat_{k}': getattr(self, f'mat_{k}').get() for k in ['ribs', 'main_spar', 'front_spar', 'rear_spar', 'plank', 'te', 'connectors', 'stringers', 'xbrace_wires', 'diag_spars', 'carbon_ribs', 'te_caps', 'rib_caps', 'film', 'js_cap', 'js_foam', 'js_skin'] if hasattr(self, f'mat_{k}')},
@@ -180,8 +180,23 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             ttk.Button(self.pm.obj.groups_frames['Cross Bracing'], text="Auto Set X-Brace", command=self.auto_set_xbrace_zones).grid(row=99, column=0, columnspan=4, pady=5)
             
         if 'CNC' in self.pm.obj.tabs_frames:
+            self.create_cnc_selection_ui(self.pm.obj.tabs_frames['CNC'])
             ttk.Button(self.pm.obj.tabs_frames['CNC'], text="Export G-Code", command=self.export_gcode_all).pack(fill=tk.X, padx=10, pady=5)
-            ttk.Button(self.pm.obj.tabs_frames['Foam'], text="Open in Foam CAM", command=self.open_in_foam_cam).pack(fill=tk.X, padx=10, pady=5)
+            
+        if 'Foam' in self.pm.obj.tabs_frames:
+            f_tab = self.pm.obj.tabs_frames['Foam']
+            lf = ttk.LabelFrame(f_tab, text="Cutout Range (Ribs)")
+            lf.pack(fill=tk.X, padx=10, pady=5)
+            
+            ttk.Label(lf, text="Start Rib:").grid(row=0, column=0, padx=5, pady=2, sticky="e")
+            self.combo_foam_start = ttk.Combobox(lf, state="readonly", width=25)
+            self.combo_foam_start.grid(row=0, column=1, padx=5, pady=2, sticky="w")
+            
+            ttk.Label(lf, text="End Rib:").grid(row=1, column=0, padx=5, pady=2, sticky="e")
+            self.combo_foam_end = ttk.Combobox(lf, state="readonly", width=25)
+            self.combo_foam_end.grid(row=1, column=1, padx=5, pady=2, sticky="w")
+            
+            ttk.Button(f_tab, text="Open in Foam CAM", command=self.open_in_foam_cam).pack(fill=tk.X, padx=10, pady=5)
             
         if 'DXF' in self.pm.obj.tabs_frames:
             self.create_dxf_selection_ui(self.pm.obj.tabs_frames['DXF'])
@@ -290,18 +305,18 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
                 rib_only_values = [item['label'] for item in items if item['type'] == 'rib']
                 self.combo_foam_start['values'] = rib_only_values
                 self.combo_foam_end['values'] = rib_only_values
-                
+                if rib_only_values:
+                    if self.combo_foam_start.current() < 0: self.combo_foam_start.current(0)
+                    if self.combo_foam_end.current() < 0: self.combo_foam_end.current(len(rib_only_values)-1)
+            
             if len(c_values) > 0:
                 current = self.current_rib_idx.get()
                 if current >= len(c_values): current = len(c_values) - 1
                 self.combo_rib.current(current); self.current_rib_idx.set(current)
-                
-                if hasattr(self, 'combo_foam_start'):
-                    if self.combo_foam_start.current() < 0: self.combo_foam_start.current(0)
-                    if self.combo_foam_end.current() < 0: self.combo_foam_end.current(len(c_values)-1)
                     
             self.on_rib_select_fast(None)
             self.update_dxf_selection_ui()
+            self.update_cnc_selection_ui()
         except Exception: pass
 
     def create_dxf_selection_ui(self, parent):
@@ -359,6 +374,72 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
         except Exception:
             pass
 
+
+    def create_cnc_selection_ui(self, parent):
+        import tkinter as tk
+        from tkinter import ttk
+
+        frame = ttk.LabelFrame(parent, text="Rib/Jig CNC Export Selection")
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Select/Deselect All Buttons
+        btn_frame = tk.Frame(frame)
+        btn_frame.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Button(btn_frame, text="Select All", command=lambda: self._set_all_cnc_selection(True)).pack(side="left", padx=2)
+        ttk.Button(btn_frame, text="Deselect All", command=lambda: self._set_all_cnc_selection(False)).pack(side="left", padx=2)
+
+        canvas = tk.Canvas(frame)
+        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+        self.cnc_scrollable_frame = ttk.Frame(canvas)
+
+        self.cnc_scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(
+                scrollregion=canvas.bbox("all")
+            )
+        )
+
+        canvas.create_window((0, 0), window=self.cnc_scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        self.cnc_selection_vars = {}
+
+    def _set_all_cnc_selection(self, state):
+        for var in self.cnc_selection_vars.values():
+            var.set(state)
+
+    def update_cnc_selection_ui(self):
+        import tkinter as tk
+        from tkinter import ttk
+        if not hasattr(self, 'cnc_scrollable_frame'): return
+
+        for widget in self.cnc_scrollable_frame.winfo_children():
+            widget.destroy()
+
+        self.cnc_selection_vars.clear()
+
+        if hasattr(self, 'preview_items'):
+            for item in self.preview_items:
+                var = tk.BooleanVar(value=True)
+                key = f"{item['type']}_{item.get('loc', '')}_{item.get('pos', '')}_{item['idx']}"
+                self.cnc_selection_vars[key] = var
+                ttk.Checkbutton(self.cnc_scrollable_frame, text=item['label'], variable=var).pack(anchor="w", padx=5)
+
+        try:
+            jig_str = self.pm.vars.get('jig_y_positions').get() if 'jig_y_positions' in self.pm.vars else ''
+            if jig_str:
+                jigs = [float(v.strip()) for v in jig_str.split(',') if v.strip()]
+                for j_idx, jy in enumerate(jigs):
+                    var = tk.BooleanVar(value=True)
+                    key = f"jig_{j_idx}"
+                    self.cnc_selection_vars[key] = var
+                    ttk.Checkbutton(self.cnc_scrollable_frame, text=f"Jig No.{j_idx} (Y={jy:.1f}mm)", variable=var).pack(anchor="w", padx=5)
+        except Exception:
+            pass
+
     def open_in_foam_cam(self):
         idx_start = self.combo_foam_start.current()
         idx_end = self.combo_foam_end.current()
@@ -401,7 +482,21 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             
             from ui.foam_mode import FoamCutterGUI
             top = tk.Toplevel(self.root)
-            FoamCutterGUI(top, root_file=temp_root, tip_file=temp_tip, block_width=calc_width, wing_type=self.wing_type.get())
+            
+            t_thick = self.safe_float(self.plank_thick) if target == "Plank" else self.safe_float(self.rib_thick)
+            
+            FoamCutterGUI(
+                top, 
+                root_file=temp_root, tip_file=temp_tip, block_width=calc_width, wing_type=self.wing_type.get(),
+                target_type=target, target_thickness=t_thick,
+                cut_kerf=self.safe_float(self.foam_cut_kerf, 1.5),
+                wire_dist=self.safe_float(self.foam_wire_dist, 1000.0),
+                offset_x=self.safe_float(self.foam_offset_x, 0.0),
+                offset_y=self.safe_float(self.foam_offset_y, 0.0),
+                entry_x=self.safe_float(self.foam_entry_x, 0.0),
+                entry_y=self.safe_float(self.foam_entry_y, 0.0),
+                feedrate=self.safe_float(self.foam_feedrate, 100.0)
+            )
             
         except Exception as e:
             messagebox.showerror("Error", str(e))

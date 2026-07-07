@@ -57,7 +57,7 @@ class SpindleCAMEngine:
                 
         return target_z
 
-    def generate_gcode(self, rib_res, params: Dict[str, Any]) -> Tuple[str, List[str]]:
+    def generate_gcode(self, rib_res, params: Dict[str, Any], is_jig: bool = False) -> Tuple[str, List[str]]:
         """
         Generate G-code for a single rib.
         Returns:

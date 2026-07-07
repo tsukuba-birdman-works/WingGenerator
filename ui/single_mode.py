@@ -122,7 +122,10 @@ class RibGeneratorGUI_Single(BaseRibGeneratorGUI):
             fast_mode=fast_mode,
             tabs_active=self.tabs_active.get(),
             truss_tab_width=self.safe_float(self.truss_tab_width, 4.0),
-            spar_tab_width=self.safe_float(self.main_spar_support_w, 4.0)
+            spar_tab_width=self.safe_float(self.main_spar_support_w, 4.0),
+            le_interp_active=self.le_interp_active.get(),
+            le_interp_range=self.safe_float(self.le_interp_range, 10.0),
+            le_interp_divisions=self.safe_int(self.le_interp_divisions, 50)
         )
 
     def create_widgets(self):

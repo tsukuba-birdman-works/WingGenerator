@@ -58,6 +58,9 @@ class RibParameters:
     stringers_data: List[Dict[str, Any]]
     te_cut: float
     apply_safe_margin: bool
+    le_interp_active: bool
+    le_interp_range: float
+    le_interp_divisions: int
     te_cap_uf_act: bool
     te_cap_uf_w: float
     te_cap_ur_act: bool
@@ -695,6 +698,56 @@ class RibGeneratorEngine:
         process_side(blocks_r, is_rear=True)
         return sharp_polys
 
+    def interpolate_leading_edge(self, u_x, u_y, l_x, l_y, chord, rng_pct, divisions):
+        import scipy.interpolate
+        
+        x_thresh = (rng_pct / 100.0) * chord
+        
+        u_mask = u_x <= x_thresh
+        l_mask = l_x <= x_thresh
+        
+        l_x_sub = l_x[l_mask][::-1]
+        l_y_sub = l_y[l_mask][::-1]
+        
+        u_x_sub = u_x[u_mask][1:]
+        u_y_sub = u_y[u_mask][1:]
+        
+        x_sub = np.concatenate((l_x_sub, u_x_sub))
+        y_sub = np.concatenate((l_y_sub, u_y_sub))
+        
+        if len(x_sub) < 4:
+            return u_x, u_y, l_x, l_y
+            
+        dx = np.diff(x_sub)
+        dy = np.diff(y_sub)
+        dist = np.sqrt(dx**2 + dy**2)
+        t = np.concatenate(([0], np.cumsum(dist)))
+        if t[-1] == 0: return u_x, u_y, l_x, l_y
+        t /= t[-1]
+        
+        spline_x = scipy.interpolate.CubicSpline(t, x_sub)
+        spline_y = scipy.interpolate.CubicSpline(t, y_sub)
+        
+        t_new = np.linspace(0, 1, int(divisions))
+        x_new = spline_x(t_new)
+        y_new = spline_y(t_new)
+        
+        le_idx = np.argmin(x_new)
+        
+        new_l_x = x_new[:le_idx+1][::-1]
+        new_l_y = y_new[:le_idx+1][::-1]
+        
+        new_u_x = x_new[le_idx:]
+        new_u_y = y_new[le_idx:]
+        
+        final_u_x = np.concatenate((new_u_x, u_x[~u_mask]))
+        final_u_y = np.concatenate((new_u_y, u_y[~u_mask]))
+        
+        final_l_x = np.concatenate((new_l_x, l_x[~l_mask]))
+        final_l_y = np.concatenate((new_l_y, l_y[~l_mask]))
+        
+        return final_u_x, final_u_y, final_l_x, final_l_y
+
     def generate_single_rib(self, p: RibParameters) -> RibGenerationResult:
         file1 = p.file1
         file2 = p.file2
@@ -769,6 +822,11 @@ class RibGeneratorEngine:
         le_idx = np.argmin(scaled[:, 0])
         u_x_orig, u_y_orig = scaled[:le_idx+1, 0][::-1], scaled[:le_idx+1, 1][::-1]
         l_x_orig, l_y_orig = scaled[le_idx:, 0], scaled[le_idx:, 1]
+        
+        if p.le_interp_active:
+            u_x_orig, u_y_orig, l_x_orig, l_y_orig = self.interpolate_leading_edge(
+                u_x_orig, u_y_orig, l_x_orig, l_y_orig, chord, p.le_interp_range, p.le_interp_divisions
+            )
         
         spar_x = chord * (spar_pct / 100.0)
         spar_y = (np.interp(spar_x, u_x_orig, u_y_orig) + np.interp(spar_x, l_x_orig, l_y_orig)) / 2.0
@@ -1313,7 +1371,10 @@ class RibGeneratorEngine:
             bolt2_dx=b2[0], bolt2_dy=b2[1], bolt2_dia=b2[2],
             diag_params_list=diag_params, fast_mode=p.get('fast_mode', False),
             tabs_active=p.get('tabs_active', True),
-            truss_tab_width=float(p.get('truss_tab_width', '4.0'))
+            truss_tab_width=float(p.get('truss_tab_width', '4.0')),
+            le_interp_active=p.get('le_interp_active', False),
+            le_interp_range=p.get('le_interp_range', 10.0),
+            le_interp_divisions=int(p.get('le_interp_divisions', 50))
         )
         
         return self.generate_single_rib(params_obj)
