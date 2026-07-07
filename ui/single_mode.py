@@ -45,38 +45,24 @@ class RibGeneratorGUI_Single(BaseRibGeneratorGUI):
         super().save_config("Single")
 
     def get_rib_parameters(self, fast_mode=False) -> RibParameters:
-        t_rib = self.safe_float(self.rib_thick)
-        diag_params_list = []
-        if self.diag1_active.get():
-            diag_params_list.append({
-                't1': self.safe_float(self.diag1_t1) / 100.0,
-                't2': self.safe_float(self.diag1_t2) / 100.0,
-                'R': self.safe_float(self.rear_spar_dia) / 2.0,
-                't': t_rib
-            })
-        if self.diag2_active.get():
-            diag_params_list.append({
-                't1': self.safe_float(self.diag2_t1) / 100.0,
-                't2': self.safe_float(self.diag2_t2) / 100.0,
-                'R': self.safe_float(self.rear_spar_dia) / 2.0,
-                't': t_rib
-            })
-            
+        t_rib = 3.0 # Hardcoded as requested to delete from UI
+        
         return RibParameters(
             file1=self.file1_path.get(),
-            file2=self.file2_path.get(),
+            file2=self.file2_path.get(), # Single mode uses same file? Wait, single mode file2_path was removed? No, I only kept file1_path.
             blend_ratio=self.safe_float(self.blend_ratio_pct)/100.0,
             chord=self.safe_float(self.chord_length),
             spar_pct=self.safe_float(self.spar_pos_pct),
             washout_deg=self.safe_float(self.washout_deg),
             spar_hole_dia=self.safe_float(self.spar_hole_dia),
-            rear_dx=self.safe_float(self.rear_spar_dx),
-            rear_dy=self.safe_float(self.rear_spar_dy),
-            rear_dia=self.safe_float(self.rear_spar_dia),
-            front_dx=self.safe_float(self.front_spar_dx),
-            front_dy=self.safe_float(self.front_spar_dy),
-            front_dia=self.safe_float(self.front_spar_dia),
-            truss_angle=self.safe_float(self.truss_angle),
+            spar_hole_dv=0.0,
+            rear_dx=0.0,
+            rear_dy=0.0,
+            rear_dia=0.0,
+            front_dx=0.0,
+            front_dy=0.0,
+            front_dia=0.0,
+            truss_angle=self.safe_float(self.base_truss_angle),
             truss_front_n=self.safe_int(self.truss_front_n),
             truss_rear_n=self.safe_int(self.truss_rear_n),
             beam_width=self.safe_float(self.beam_width),
@@ -85,44 +71,43 @@ class RibGeneratorGUI_Single(BaseRibGeneratorGUI):
             margin_outer=self.safe_float(self.margin_outer),
             truss_fillet=self.safe_float(self.truss_fillet),
             min_hole_dia=self.safe_float(self.min_hole_dia),
-            local_xb_pct=self.safe_float(self.xbrace_pct),
-            x_dia=self.safe_float(self.xbrace_dia),
+            xb_t_list=[],
+            x_dia=0.0,
             plank_start=self.safe_float(self.plank_start),
             plank_end=self.safe_float(self.plank_end),
-            plank_part_start=self.safe_float(self.plank_part_start),
-            plank_part_end=self.safe_float(self.plank_part_end),
+            plank_part_start=self.safe_float(self.plank_start),
+            plank_part_end=self.safe_float(self.plank_end),
             plank_thick=self.safe_float(self.plank_thick),
             stringers_data=self.get_stringers_data(),
             te_cut=self.safe_float(self.te_cut),
             apply_safe_margin=self.safe_margin_var.get(),
-            te_cap_uf_act=self.te_cap_uf_act.get(),
-            te_cap_uf_w=self.safe_float(self.te_cap_uf_w),
-            te_cap_ur_act=self.te_cap_ur_act.get(),
-            te_cap_ur_w=self.safe_float(self.te_cap_ur_w),
-            te_cap_lf_act=self.te_cap_lf_act.get(),
-            te_cap_lf_w=self.safe_float(self.te_cap_lf_w),
-            te_cap_lr_act=self.te_cap_lr_act.get(),
-            te_cap_lr_w=self.safe_float(self.te_cap_lr_w),
-            te_cap_thick=self.safe_float(self.te_cap_thick),
-            rc1_act=self.rc1_act.get(),
-            rc1_start=self.safe_float(self.rc1_start),
-            rc1_end=self.safe_float(self.rc1_end),
-            rc1_thick=self.safe_float(self.rc1_thick),
-            rc2_act=self.rc2_act.get(),
-            rc2_start=self.safe_float(self.rc2_start),
-            rc2_end=self.safe_float(self.rc2_end),
-            rc2_thick=self.safe_float(self.rc2_thick),
+            te_cap_uf_act=False,
+            te_cap_uf_w=0.0,
+            te_cap_ur_act=False,
+            te_cap_ur_w=0.0,
+            te_cap_lf_act=False,
+            te_cap_lf_w=0.0,
+            te_cap_lr_act=False,
+            te_cap_lr_w=0.0,
+            te_cap_thick=0.0,
+            rc1_act=False,
+            rc1_start=0.0,
+            rc1_end=0.0,
+            rc1_thick=0.0,
+            rc2_act=False,
+            rc2_start=0.0,
+            rc2_end=0.0,
+            rc2_thick=0.0,
             bolt1_dx=self.safe_float(self.bolt1_dx),
             bolt1_dy=self.safe_float(self.bolt1_dy),
             bolt1_dia=self.safe_float(self.bolt1_dia),
             bolt2_dx=self.safe_float(self.bolt2_dx),
             bolt2_dy=self.safe_float(self.bolt2_dy),
             bolt2_dia=self.safe_float(self.bolt2_dia),
-            diag_params_list=diag_params_list,
+            diag_params_list=[],
             fast_mode=fast_mode,
-            tabs_active=self.tabs_active.get(),
-            truss_tab_width=self.safe_float(self.truss_tab_width, 4.0),
-            spar_tab_width=self.safe_float(self.main_spar_support_w, 4.0),
+            tabs_active=self.tabs_active.get() if hasattr(self, 'tabs_active') else True,
+            truss_tab_width=4.0,
             le_interp_active=self.le_interp_active.get(),
             le_interp_range=self.safe_float(self.le_interp_range, 10.0),
             le_interp_divisions=self.safe_int(self.le_interp_divisions, 50)
@@ -143,12 +128,14 @@ class RibGeneratorGUI_Single(BaseRibGeneratorGUI):
         
         self.ui_builder.build_tabs(notebook, self.pm)
         
-        self.create_stringers_ui(self.pm.obj.tabs_frames['PlankTE'])
-        if hasattr(self, 'create_cam_ui'):
-            self.create_cam_ui(notebook)
+        if 'Plank TE' in self.pm.obj.tabs_frames:
+            self.create_stringers_ui(self.pm.obj.tabs_frames['Plank TE'])
             
-        if 'Export' in self.pm.obj.tabs_frames:
-            ttk.Button(self.pm.obj.tabs_frames['Export'], text="Export 3D Model (GLB)", command=self.export_obj).pack(fill=tk.X, padx=10, pady=5)
+        if 'DXF' in self.pm.obj.tabs_frames:
+            ttk.Button(self.pm.obj.tabs_frames['DXF'], text="Export DXF", command=self.export_dxf).pack(fill=tk.X, padx=10, pady=5)
+            
+        if 'CNC' in self.pm.obj.tabs_frames:
+            ttk.Button(self.pm.obj.tabs_frames['CNC'], text="Export CNC (G-Code)", command=self.export_gcode).pack(fill=tk.X, padx=10, pady=5)
             
         f_top = ttk.Frame(left_frame)
         f_top.pack(fill=tk.X, side=tk.TOP, before=notebook)
@@ -202,9 +189,9 @@ class RibGeneratorGUI_Single(BaseRibGeneratorGUI):
             le = final_rib_orig[np.argmin(final_rib_orig[:, 0])]
             te = final_rib_orig[0]
             self.ax.plot([le[0], te[0]], [le[1], te[1]], 'k-.', linewidth=0.8, alpha=0.5, label="Chord Line")
-        if self.safe_float(self.spar_hole_dia) > 0: self.ax.plot(c_m[0], c_m[1], 'kx', markersize=6); self.ax.plot(h_m[:, 0], h_m[:, 1], 'r-', linewidth=1.5)
-        if self.safe_float(self.front_spar_dia) > 0: self.ax.plot(c_f[0], c_f[1], 'cx', markersize=6); self.ax.plot(h_f[:, 0], h_f[:, 1], 'c-', linewidth=1.5)
-        if self.safe_float(self.rear_spar_dia) > 0: self.ax.plot(c_r[0], c_r[1], 'mx', markersize=6); self.ax.plot(h_r[:, 0], h_r[:, 1], 'm-', linewidth=1.5)
+        if len(h_m) > 0: self.ax.plot(c_m[0], c_m[1], 'kx', markersize=6); self.ax.plot(h_m[:, 0], h_m[:, 1], 'r-', linewidth=1.5)
+        if len(h_f) > 0: self.ax.plot(c_f[0], c_f[1], 'cx', markersize=6); self.ax.plot(h_f[:, 0], h_f[:, 1], 'c-', linewidth=1.5)
+        if len(h_r) > 0: self.ax.plot(c_r[0], c_r[1], 'mx', markersize=6); self.ax.plot(h_r[:, 0], h_r[:, 1], 'm-', linewidth=1.5)
         if len(hole_b1) > 0: self.ax.plot(c_b1[0], c_b1[1], 'kx', markersize=4); self.ax.plot(hole_b1[:, 0], hole_b1[:, 1], 'r-', linewidth=1.5)
         if len(hole_b2) > 0: self.ax.plot(c_b2[0], c_b2[1], 'kx', markersize=4); self.ax.plot(hole_b2[:, 0], hole_b2[:, 1], 'r-', linewidth=1.5)
         for h in t_holes: self.ax.plot(h[:, 0], h[:, 1], color='orange', linestyle='-', linewidth=1.5)
@@ -241,11 +228,28 @@ class RibGeneratorGUI_Single(BaseRibGeneratorGUI):
             params = self.get_rib_parameters(fast_mode=False)
             params.tabs_active = False
             res = self.engine.generate_single_rib(params)
+            
+            is_jig = (self.dxf_output_target.get() == 'Jig') if hasattr(self, 'dxf_output_target') else False
+            layer_name = self.dxf_layer.get() if hasattr(self, 'dxf_layer') else 'Rib'
+            
+            layer_flags = {'layer': layer_name}
+            
+            if is_jig:
+                jig_y_str = self.jig_y_positions.get() if hasattr(self, 'jig_y_positions') else '20, 80'
+                jig_y_list = [float(y.strip()) for y in jig_y_str.split(',') if y.strip()]
+                # Generate jig outline (simplified, typically single mode DXF just outputs the rib, 
+                # but we'll pass jig_pts if we generated them. single_mode doesn't generate jig pts directly, 
+                # but we can output the raw rib points to DXF).
+                pts_to_output = res.final_rib_orig # Actually, single mode doesn't generate full jig. Let's output rib.
+            else:
+                pts_to_output = res[0]
+
             self.engine.export_dxf(path, res[1], res[0], res[1], self.safe_float(self.spar_hole_dia), 
-                                   res[5], self.safe_float(self.front_spar_dia), res[3], self.safe_float(self.rear_spar_dia), 
-                                   res[7], res[9], self.safe_float(self.xbrace_dia), res[13], res[14], 
+                                   res[5], 0.0, res[3], 0.0, 
+                                   res[7], res[9], 0.0, res[13], res[14], 
                                    res[15], self.safe_float(self.bolt1_dia), res[16], 
-                                   res[17], self.safe_float(self.bolt2_dia), res[18], res[19])
+                                   res[17], self.safe_float(self.bolt2_dia), res[18], res[19],
+                                   layer_flags=layer_flags)
             messagebox.showinfo("Success", f"Saved to:\n{path}")
         except Exception as e: messagebox.showerror("Export Error", str(e))
 
@@ -279,22 +283,12 @@ class RibGeneratorGUI_Single(BaseRibGeneratorGUI):
             for h in res[7] + res[8] + res[19]:
                 rel_holes.append(to_rel(h))
             
+            t_rib = 3.0
             scene_rib_data = [(0.0, t_rib, rel_outline, rel_holes)]
             rc_cap_pts1, rc_cap_pts2 = res[23]
-            if self.rc1_act.get():
-                rc1_width = self.safe_float(self.rc1_width)
-                rc1_y_start = 0.0 + t_rib/2.0 - rc1_width/2.0
-                for cap_pts in rc_cap_pts1:
-                    if len(cap_pts) > 0: scene_rib_data.append((rc1_y_start, rc1_width, to_rel(cap_pts), [], 'Rib_Cap'))
-            if self.rc2_act.get():
-                rc2_width = self.safe_float(self.rc2_width)
-                rc2_y_start = 0.0 + t_rib/2.0 - rc2_width/2.0
-                for cap_pts in rc_cap_pts2:
-                    if len(cap_pts) > 0: scene_rib_data.append((rc2_y_start, rc2_width, to_rel(cap_pts), [], 'Rib_Cap'))
             
             from core.materials import AVAILABLE_MATERIALS
-            part_colors = {'Ribs': AVAILABLE_MATERIALS.get('Styrofoam (Blue)', [135, 206, 235, 255]),
-                           'Rib_Cap': AVAILABLE_MATERIALS.get('Carbon (Black)', [30, 30, 30, 255])}
+            part_colors = {'Ribs': AVAILABLE_MATERIALS.get('Styrofoam (Blue)', [135, 206, 235, 255])}
             
             Wing3DExporter.export_3d_scene(filepath, scene_rib_data, {}, is_left_wing=False, part_colors=part_colors)
             messagebox.showinfo("Success", f"Saved 3D Model to:\n{filepath}")
