@@ -18,6 +18,16 @@ class BaseRibGeneratorGUI:
         except Exception:
             return default
 
+    def safe_float_or_none(self, var):
+        try:
+            val = var.get()
+            if isinstance(val, str):
+                val = val.strip()
+                return float(val) if val else None
+            return float(val)
+        except Exception:
+            return None
+
     def safe_int(self, var, default=0):
         try:
             val = var.get()
@@ -75,7 +85,7 @@ class BaseRibGeneratorGUI:
         ConfigHelper.save_config(self, mode_name)
 
     def create_stringers_ui(self, parent_frame):
-        tab = tk.LabelFrame(parent_frame, text='Stringers')
+        tab = tk.LabelFrame(parent_frame, text='ストリンガー')
         tab.pack(fill=tk.X, padx=10, pady=5)
         headers = ["Act", "Pos(%)", "W(mm)", "D(mm)", "Use DXF", "DXF Path", ""]
         for col, h in enumerate(headers):
@@ -309,130 +319,4 @@ class BaseRibGeneratorGUI:
         ttk.Button(btn_frame, text="Load Tool Config", command=self.load_tool_config).pack(side="left", padx=5)
         ttk.Button(btn_frame, text="Save Tool Config", command=self.save_tool_config).pack(side="left", padx=5)
 
-
-    def get_cam_vars(self):
-        return {
-            'tabs_active': self.tabs_active,
-            'truss_tab_width': self.truss_tab_width,
-            'outer_tab_width': getattr(self, 'outer_tab_width', self.truss_tab_width),
-            'outer_tab_interval': getattr(self, 'outer_tab_interval', tk.StringVar(value="100.0")),
-            'tab_angle_deg': getattr(self, 'tab_angle_deg', tk.StringVar(value="45.0")),
-            'tab_exclusion_stringer': getattr(self, 'tab_exclusion_stringer', tk.StringVar(value="10.0")),
-            'tab_exclusion_le_te': getattr(self, 'tab_exclusion_le_te', tk.StringVar(value="30.0")),
-            'main_spar_support_w': self.main_spar_support_w,
-            'main_spar_support_h': self.main_spar_support_h,
-            'main_spar_support_thick': self.main_spar_support_thick,
-            'tab_thickness': self.tab_thickness,
-            'spar_bridge_padding': self.spar_bridge_padding,
-            'spar_bridge_thickness': self.spar_bridge_thickness,
-            'cam_tool_dia': self.cam_tool_dia,
-            'cam_mat_thick': self.cam_mat_thick,
-            'cam_safe_z': self.cam_safe_z,
-            'cam_feed_rate': self.cam_feed_rate,
-            'cam_spindle_speed': self.cam_spindle_speed,
-            'cam_extra_depth': self.cam_extra_depth,
-            'cam_milling_dir': self.cam_milling_dir
-        }
-
-    def create_cam_ui(self, notebook):
-        from tkinter import ttk
-        # Create the CNC tab
-        f_tab_outer = ttk.Frame(notebook)
-        notebook.add(f_tab_outer, text="CNC")
-        
-        
-        # Add scrollbars just like other tabs
-        import tkinter as tk
-        canvas = tk.Canvas(f_tab_outer, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(f_tab_outer, orient="vertical", command=canvas.yview)
-        parent_frame = ttk.Frame(canvas)
-        if hasattr(self, 'pm'):
-            self.pm.obj.tabs_frames['CNC'] = parent_frame
-
-        parent_frame.bind("<Configure>", lambda e, c=canvas: c.configure(scrollregion=c.bbox("all")))
-        canvas.create_window((0, 0), window=parent_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        def _on_mousewheel(event, c=canvas):
-            c.yview_scroll(int(-1*(event.delta/120)), "units")
-        f_tab_outer.bind("<Enter>", lambda e, c=canvas, mw=_on_mousewheel: c.bind_all("<MouseWheel>", mw))
-        f_tab_outer.bind("<Leave>", lambda e, c=canvas: c.unbind_all("<MouseWheel>"))
-
-        tab = tk.LabelFrame(parent_frame, text='CNC Support & Tool Settings')
-        tab.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        left_panel = tk.Frame(tab)
-        left_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        tk.Checkbutton(left_panel, text="Enable All Tabs", variable=self.tabs_active).pack(anchor="w", pady=(0, 5))
-        
-        lf_truss = tk.LabelFrame(left_panel, text="Holding Tabs")
-        lf_truss.pack(fill=tk.X, pady=5)
-        
-        tk.Label(lf_truss, text="Inner Tab Base Width (mm):").grid(row=0, column=0, sticky="e", padx=5, pady=2)
-        tk.Entry(lf_truss, textvariable=self.truss_tab_width, width=8).grid(row=0, column=1, sticky="w", padx=5, pady=2)
-        
-        tk.Label(lf_truss, text="Outer Tab Base Width (mm):").grid(row=1, column=0, sticky="e", padx=5, pady=2)
-        tk.Entry(lf_truss, textvariable=self.outer_tab_width, width=8).grid(row=1, column=1, sticky="w", padx=5, pady=2)
-        
-        tk.Label(lf_truss, text="Outer Tab Interval (mm):").grid(row=2, column=0, sticky="e", padx=5, pady=2)
-        tk.Entry(lf_truss, textvariable=self.outer_tab_interval, width=8).grid(row=2, column=1, sticky="w", padx=5, pady=2)
-
-        tk.Label(lf_truss, text="Tab Thickness Z (mm):").grid(row=3, column=0, sticky="e", padx=5, pady=2)
-        tk.Entry(lf_truss, textvariable=self.tab_thickness, width=8).grid(row=3, column=1, sticky="w", padx=5, pady=2)
-        
-        tk.Label(lf_truss, text="Tab Z Angle (deg):").grid(row=4, column=0, sticky="e", padx=5, pady=2)
-        tk.Entry(lf_truss, textvariable=self.tab_angle_deg, width=8).grid(row=4, column=1, sticky="w", padx=5, pady=2)
-
-        tk.Label(lf_truss, text="Exclusion (Stringer, mm):").grid(row=5, column=0, sticky="e", padx=5, pady=2)
-        tk.Entry(lf_truss, textvariable=self.tab_exclusion_stringer, width=8).grid(row=5, column=1, sticky="w", padx=5, pady=2)
-
-        tk.Label(lf_truss, text="Exclusion (LE/TE, mm):").grid(row=6, column=0, sticky="e", padx=5, pady=2)
-        tk.Entry(lf_truss, textvariable=self.tab_exclusion_le_te, width=8).grid(row=6, column=1, sticky="w", padx=5, pady=2)
-        
-        lf_main = tk.LabelFrame(left_panel, text="Main Spar E-Support")
-        lf_main.pack(fill=tk.X, pady=5)
-        tk.Label(lf_main, text="Leg Width (mm):").grid(row=0, column=0, sticky="e", padx=5, pady=5)
-        tk.Entry(lf_main, textvariable=self.main_spar_support_w, width=8).grid(row=0, column=1, sticky="w", padx=5, pady=5)
-        tk.Label(lf_main, text="Lift Height (mm):").grid(row=1, column=0, sticky="e", padx=5, pady=5)
-        tk.Entry(lf_main, textvariable=self.main_spar_support_h, width=8).grid(row=1, column=1, sticky="w", padx=5, pady=5)
-        tk.Label(lf_main, text="Snap Thickness Z (mm):").grid(row=2, column=0, sticky="e", padx=5, pady=5)
-        tk.Entry(lf_main, textvariable=self.main_spar_support_thick, width=8).grid(row=2, column=1, sticky="w", padx=5, pady=5)
-        
-        lf_fr = tk.LabelFrame(left_panel, text="F/R Spar Tabs")
-        lf_fr.pack(fill=tk.X, pady=5)
-        tk.Label(lf_fr, text="Bridge Padding (mm):").grid(row=0, column=0, sticky="e", padx=5, pady=5)
-        tk.Entry(lf_fr, textvariable=self.spar_bridge_padding, width=8).grid(row=0, column=1, sticky="w", padx=5, pady=5)
-        tk.Label(lf_fr, text="Snap Thickness Z (mm):").grid(row=1, column=0, sticky="e", padx=5, pady=5)
-        tk.Entry(lf_fr, textvariable=self.spar_bridge_thickness, width=8).grid(row=1, column=1, sticky="w", padx=5, pady=5)
-
-        
-        lf_cam = tk.LabelFrame(tab, text="3-Axis CNC CAM Settings")
-        lf_cam.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        tk.Label(lf_cam, text="Tool Diameter (mm):").grid(row=0, column=0, sticky="e", padx=5, pady=5)
-        tk.Entry(lf_cam, textvariable=self.cam_tool_dia, width=8).grid(row=0, column=1, sticky="w", padx=5, pady=5)
-        
-        tk.Label(lf_cam, text="Material Thickness (mm):").grid(row=1, column=0, sticky="e", padx=5, pady=5)
-        tk.Entry(lf_cam, textvariable=self.cam_mat_thick, width=8).grid(row=1, column=1, sticky="w", padx=5, pady=5)
-        
-        tk.Label(lf_cam, text="Clearance / Safe Z (mm):").grid(row=2, column=0, sticky="e", padx=5, pady=5)
-        tk.Entry(lf_cam, textvariable=self.cam_safe_z, width=8).grid(row=2, column=1, sticky="w", padx=5, pady=5)
-        
-        tk.Label(lf_cam, text="Cut Feed Rate (mm/min):").grid(row=3, column=0, sticky="e", padx=5, pady=5)
-        tk.Entry(lf_cam, textvariable=self.cam_feed_rate, width=8).grid(row=3, column=1, sticky="w", padx=5, pady=5)
-        
-        tk.Label(lf_cam, text="Spindle Speed (RPM):").grid(row=4, column=0, sticky="e", padx=5, pady=5)
-        tk.Entry(lf_cam, textvariable=self.cam_spindle_speed, width=8).grid(row=4, column=1, sticky="w", padx=5, pady=5)
-        
-        tk.Label(lf_cam, text="Extra Cut Depth (mm):").grid(row=5, column=0, sticky="e", padx=5, pady=5)
-        tk.Entry(lf_cam, textvariable=self.cam_extra_depth, width=8).grid(row=5, column=1, sticky="w", padx=5, pady=5)
-
-        tk.Label(lf_cam, text="Milling Direction:").grid(row=6, column=0, sticky="e", padx=5, pady=5)
-        dir_menu = tk.OptionMenu(lf_cam, self.cam_milling_dir, "Conventional (Outer CW)", "Climb (Outer CCW)")
-        dir_menu.config(width=10)
-        dir_menu.grid(row=6, column=1, sticky="w", padx=5, pady=5)
 

@@ -1,0 +1,340 @@
+{
+    "Project Settings": {
+        "Paths": {
+            "file1_path": "/home/akihito-kasai/Desktop/tbw/Ribgenerator/airfoils/26_center_XGAG_1.23 _11.61_48.5.dat",
+            "file2_path": "/home/akihito-kasai/Desktop/tbw/Ribgenerator/airfoils/26_1st-tip_XGAG_1.183 _11.3.dat",
+            "export_dir": ""
+        }
+    },
+    "Wing": {
+        "Layout": {
+            "wing_name": "26_No1",
+            "wing_span": "3400.0",
+            "joint_length": "300",
+            "rib_interval": "262.0",
+            "wing_type": "Right",
+            "base_aoa": "0.0",
+            "export_is_left": false
+        },
+        "Airfoil (Root)": {
+            "file1_path": "/home/akihito-kasai/Desktop/tbw/Ribgenerator/airfoils/26_center_XGAG_1.23 _11.61_48.5.dat",
+            "chord_root": "1050",
+            "spar_pos_root": "41.5",
+            "washout_root": "0.0"
+        },
+        "LE Interpolation": {
+            "le_interp_active": false,
+            "le_interp_range": "10.0",
+            "le_interp_divisions": 50
+        },
+        "Airfoil (Tip)": {
+            "file2_path": "/home/akihito-kasai/Desktop/tbw/Ribgenerator/airfoils/26_1st-tip_XGAG_1.183 _11.3.dat",
+            "chord_tip": "1030",
+            "spar_pos_tip": "40.5",
+            "washout_tip": "0.0"
+        }
+    },
+    "Spar": {
+        "Front Spar": {
+            "front_spar_dia": "10.0",
+            "front_spar_inner_dia": "8.0",
+            "front_spar_dx": "-330",
+            "front_spar_dy": "-28"
+        },
+        "Main Spar": {
+            "spar_hole_dia": "107",
+            "spar_hole_dv": "0.0",
+            "main_spar_inner_dia": "106"
+        },
+        "Rear Spar (Root)": {
+            "rear_spar_dia": "13.4",
+            "rear_spar_inner_dia": "10",
+            "rear_spar_dx_root": "400",
+            "rear_spar_dy_root": "-28"
+        },
+        "Rear Spar (Tip)": {
+            "rear_spar_dx_tip": "400",
+            "rear_spar_dy_tip": "-28"
+        },
+        "Root Bolt 1": {
+            "root_bolt1_dia": "0.0",
+            "root_bolt1_dx": "0.0",
+            "root_bolt1_dy": "0.0"
+        },
+        "Root Bolt 2": {
+            "root_bolt2_dia": "0.0",
+            "root_bolt2_dx": "0.0",
+            "root_bolt2_dy": "0.0"
+        },
+        "Tip Bolt 1": {
+            "tip_bolt1_dia": "0.0",
+            "tip_bolt1_dx": "0.0",
+            "tip_bolt1_dy": "0.0"
+        },
+        "Tip Bolt 2": {
+            "tip_bolt2_dia": "0.0",
+            "tip_bolt2_dx": "0.0",
+            "tip_bolt2_dy": "0.0"
+        },
+        "Bolt Spacers & Margins": {
+            "bolt_spacer_inner_dia": "4.0",
+            "bolt_spacer_length": "10.0",
+            "margin_bolt": "10"
+        }
+    },
+    "PlankTE": {
+        "Plank Skin": {
+            "plank_end": "65",
+            "plank_part_end": "65.0",
+            "plank_part_start": "-10",
+            "plank_start": "-10",
+            "plank_thick": "2.9"
+        },
+        "TE Cut & Thick": {
+            "te_cap_thick": "0.1",
+            "te_cut": "40.0"
+        },
+        "Upper Front Cap": {
+            "te_cap_uf_act": true,
+            "te_cap_uf_w": "10"
+        },
+        "Lower Front Cap": {
+            "te_cap_lf_act": true,
+            "te_cap_lf_w": "10"
+        },
+        "Upper Rear Cap": {
+            "te_cap_ur_act": true,
+            "te_cap_ur_w": "15"
+        },
+        "Lower Rear Cap": {
+            "te_cap_lr_act": true,
+            "te_cap_lr_w": "15"
+        }
+    },
+    "Rib": {
+        "Truss & Margins": {
+            "base_truss_angle": "60.0",
+            "beam_width": "10",
+            "edge_beam_width": "20",
+            "margin_outer": "10",
+            "margin_outer_edge": "20",
+            "margin_spar": "10",
+            "min_hole_dia": "3.0",
+            "truss_fillet": "5.0",
+            "truss_front_n": "2",
+            "truss_rear_n": "3",
+            "safe_margin_var": true
+        },
+        "Root Carbon Rib": {
+            "cr_root_in_act": true,
+            "cr_root_out_act": true,
+            "cr_root_out_te": false
+        },
+        "Tip Carbon Rib": {
+            "cr_tip_in_act": true,
+            "cr_tip_out_act": true,
+            "cr_tip_out_te": false
+        },
+        "Carbon Ribs General": {
+            "cr_thick": "0.2"
+        },
+        "Rib Cap 1": {
+            "rc1_act": true,
+            "rc1_end": "100",
+            "rc1_start": "65",
+            "rc1_thick": "0.1",
+            "rc1_width": "8"
+        },
+        "Rib Cap 2": {
+            "rc2_act": true,
+            "rc2_end": "-100",
+            "rc2_start": "-10",
+            "rc2_thick": "0.1",
+            "rc2_width": "8"
+        },
+        "General": {
+            "rib_thick": "10"
+        }
+    },
+    "Brace & Connector": {
+        "Cross Bracing": {
+            "xbrace_dia": "30.0",
+            "xbrace_wire_dia": "2",
+            "xbrace_offset": "13.4",
+            "xb_start_a": "429.5",
+            "xb_start_b": "1476.0",
+            "xb_start_c": "2524.0",
+            "xb_end_a": "1476.0",
+            "xb_end_b": "2524.0",
+            "xb_end_c": "3570.5"
+        },
+        "Joint Sleeve 1": {
+            "js1_act": true,
+            "js1_type": "Carbon Cylinder",
+            "js1_start": "10",
+            "js1_end": "130",
+            "js1_out_dia": "110",
+            "js1_t1": "3",
+            "js1_t2": "1"
+        },
+        "Joint Sleeve 2": {
+            "js2_act": true,
+            "js2_type": "Carbon Cylinder",
+            "js2_start": "170",
+            "js2_end": "290",
+            "js2_out_dia": "110",
+            "js2_t1": "3",
+            "js2_t2": "1"
+        },
+        "Diag Connector 1": {
+            "diag1_active": false,
+            "diag1_y_main": "1176",
+            "diag1_y_rear": "1647.5"
+        },
+        "Diag Connector 2": {
+            "diag2_active": false,
+            "diag2_y_main": "2224",
+            "diag2_y_rear": "1752.5"
+        },
+        "Connectors": {
+            "conn1_type": "Y-Shape",
+            "conn1_y": "429.5",
+            "conn2_type": "V-Shape (In=Up)",
+            "conn2_y": "1476",
+            "conn3_type": "V-Shape (Out=Up)",
+            "conn3_y": "2524",
+            "conn4_type": "Y-Shape",
+            "conn4_y": "3570.5"
+        }
+    },
+    "Foam": {
+        "Foam Cutter": {
+            "foam_cut_kerf": "1",
+            "foam_wire_dist": "1300",
+            "foam_offset_x": "0.0",
+            "foam_offset_y": "0.0",
+            "foam_entry_x": "0.0",
+            "foam_entry_y": "0.0",
+            "foam_feedrate": "100.0",
+            "foam_target": "Plank"
+        }
+    },
+    "Export3D": {
+        "Parts Output": {
+            "export_carbon_ribs": true,
+            "export_connectors": true,
+            "export_diag_spars": true,
+            "export_film": true,
+            "export_front_spar": false,
+            "export_main_spar": true,
+            "export_plank": true,
+            "export_rear_spar": true,
+            "export_rib_caps": true,
+            "export_ribs": true,
+            "export_stringers": true,
+            "export_te": true,
+            "export_te_caps": true,
+            "export_xbrace_wires": true,
+            "export_joint_sleeves": true
+        },
+        "Materials": {
+            "mat_carbon_ribs": "Carbon (Black)",
+            "mat_connectors": "Carbon (Black)",
+            "mat_diag_spars": "Carbon (Black)",
+            "mat_film": "OPP Film (Clear)",
+            "mat_front_spar": "Metal (Silver)",
+            "mat_js_cap": "Carbon (Black)",
+            "mat_js_foam": "Styrofoam (Blue)",
+            "mat_js_skin": "Carbon (Black)",
+            "mat_main_spar": "Carbon (Black)",
+            "mat_plank": "Styrofoam (Blue)",
+            "mat_rear_spar": "Carbon (Black)",
+            "mat_rib_caps": "Carbon (Black)",
+            "mat_ribs": "Styrofoam (Blue)",
+            "mat_stringers": "Wood (Brown)",
+            "mat_te": "Styrofoam (Blue)",
+            "mat_te_caps": "Carbon (Black)",
+            "mat_xbrace_wires": "Kevlar (Yellow)"
+        }
+    },
+    "Jig": {
+        "Jig Settings": {
+            "jig_y_positions": "690,1738,2262,3310",
+            "jig_base_height": "120",
+            "jig_base_thickness": "50",
+            "jig_wall_thickness": "10.0",
+            "jig_pillar_angle": "90.0",
+            "jig_te_stopper_height": "10.0",
+            "jig_slot_interval": "100.0",
+            "jig_slot_width": "9",
+            "jig_slot_depth": "20"
+        }
+    },
+    "DXF": {
+        "Layers": {
+            "dxf_layer_rib_outline": true,
+            "dxf_layer_holes": true,
+            "dxf_layer_truss": true,
+            "dxf_layer_plank": true,
+            "dxf_layer_te_part": true,
+            "dxf_layer_jig_outline": true
+        },
+        "Options": {
+            "dxf_all_in_one": false
+        }
+    },
+    "Extras": {
+        "Custom Features": {
+            "str_A_active": true,
+            "str_A_pos": "-10",
+            "str_A_w": "5.0",
+            "str_A_d": "4.0",
+            "str_A_use_dxf": false,
+            "str_A_dxf": "",
+            "str_B_active": true,
+            "str_B_pos": "65.0",
+            "str_B_w": "5.0",
+            "str_B_d": "4.0",
+            "str_B_use_dxf": false,
+            "str_B_dxf": "",
+            "str_C_active": true,
+            "str_C_pos": "10",
+            "str_C_w": "5.0",
+            "str_C_d": "4.0",
+            "str_C_use_dxf": false,
+            "str_C_dxf": "",
+            "str_D_active": true,
+            "str_D_pos": "30",
+            "str_D_w": "5.0",
+            "str_D_d": "4.0",
+            "str_D_use_dxf": false,
+            "str_D_dxf": "",
+            "str_E_active": false,
+            "str_E_pos": "",
+            "str_E_w": "5.0",
+            "str_E_d": "4.0",
+            "str_E_use_dxf": false,
+            "str_E_dxf": "",
+            "tabs_active": true,
+            "truss_tab_width": "4.0",
+            "outer_tab_width": "6.0",
+            "outer_tab_interval": "100.0",
+            "tab_angle_deg": "45.0",
+            "tab_exclusion_stringer": "10.0",
+            "tab_exclusion_le_te": "30.0",
+            "main_spar_support_w": "2.0",
+            "main_spar_support_h": "5.0",
+            "main_spar_support_thick": "2.0",
+            "tab_thickness": "3.0",
+            "spar_bridge_padding": "10.0",
+            "spar_bridge_thickness": "2.0",
+            "cam_tool_dia": "2.0",
+            "cam_mat_thick": "10.0",
+            "cam_safe_z": "5.0",
+            "cam_feed_rate": "2000",
+            "cam_spindle_speed": "12000",
+            "cam_extra_depth": "0.5",
+            "cam_milling_dir": "Conventional (Outer CW)"
+        }
+    }
+}

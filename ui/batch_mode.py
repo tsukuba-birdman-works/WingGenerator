@@ -103,7 +103,9 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
 
         # Tab Support params handling for compatibility
         truss_tab_width = self.safe_float(self.truss_tab_width, 4.0)
-        ms_tab_w, ms_tab_d = 4.0, 10.0
+        ms_tab_w = self.safe_float(self.main_spar_support_w, 4.0) if hasattr(self, 'main_spar_support_w') else 4.0
+        ms_tab_d = self.safe_float(self.main_spar_support_h, 10.0) if hasattr(self, 'main_spar_support_h') else 10.0
+        ms_tab_thick = self.safe_float(self.main_spar_support_thick, 3.0) if hasattr(self, 'main_spar_support_thick') else 3.0
         
         wing_name = getattr(self, 'wing_name', tk.StringVar(value='')).get().strip().replace('/', '_').replace('\\', '_')
 
@@ -114,7 +116,9 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             'truss_angles_dict': getattr(self, 'truss_angles_dict', {}), 'stringers_data': getattr(self, 'get_stringers_data', lambda: [])(),
             'wing_type': getattr(self, 'wing_type', tk.StringVar(value="Linear")).get(),
             'wing_name': wing_name,
-            **{k: self.safe_float(getattr(self, k)) for k in ['joint_length', 'wing_span', 'chord_root', 'chord_tip', 'spar_pos_root', 'spar_pos_tip', 'washout_root', 'washout_tip', 'base_aoa', 'spar_hole_dia', 'spar_hole_dv', 'front_spar_dx', 'front_spar_dy', 'front_spar_dia', 'rear_spar_dx', 'rear_spar_dy', 'rear_spar_dia', 'plank_start', 'plank_end', 'plank_thick', 'plank_part_start', 'plank_part_end', 'te_cut', 'beam_width', 'edge_beam_width', 'margin_spar', 'margin_bolt', 'margin_outer', 'margin_outer_edge', 'base_truss_angle', 'truss_fillet', 'min_hole_dia', 'xbrace_dia', 'xbrace_wire_dia', 'xbrace_offset', 'rib_thick', 'cr_thick', 'te_cap_thick', 'rc1_start', 'rc1_end', 'rc1_thick', 'rc1_width', 'rc2_start', 'rc2_end', 'rc2_thick', 'rc2_width', 'le_interp_range', 'le_interp_divisions'] if hasattr(self, k)},
+            **{k: self.safe_float(getattr(self, k)) for k in ['joint_length', 'wing_span', 'chord_root', 'chord_tip', 'spar_pos_root', 'spar_pos_tip', 'washout_root', 'washout_tip', 'base_aoa', 'plank_start', 'plank_end', 'plank_thick', 'plank_part_start', 'plank_part_end', 'te_cut', 'beam_width', 'edge_beam_width', 'margin_spar', 'margin_bolt', 'margin_outer', 'margin_outer_edge', 'base_truss_angle', 'truss_fillet', 'min_hole_dia', 'xbrace_offset', 'rib_thick', 'cr_thick', 'te_cap_thick', 'rc1_start', 'rc1_end', 'rc1_thick', 'rc1_width', 'rc2_start', 'rc2_end', 'rc2_thick', 'rc2_width', 'le_interp_range', 'le_interp_divisions'] if hasattr(self, k)},
+            **{k: self.safe_float(getattr(self, k), default=None) for k in ['front_spar_dx', 'front_spar_dy', 'front_spar_dx_root', 'front_spar_dy_root', 'front_spar_dx_tip', 'front_spar_dy_tip', 'rear_spar_dx_root', 'rear_spar_dy_root', 'rear_spar_dx_tip', 'rear_spar_dy_tip', 'rear_spar_dx', 'rear_spar_dy'] if hasattr(self, k)},
+            **{k: self.safe_float(getattr(self, k), default=-1.0) for k in ['spar_hole_dia', 'spar_hole_dv', 'front_spar_dia', 'rear_spar_dia', 'xbrace_dia', 'xbrace_wire_dia'] if hasattr(self, k)},
             **{k: self.safe_int(getattr(self, k)) for k in ['truss_front_n', 'truss_rear_n'] if hasattr(self, k)},
             **{k: self.pm.vars[k].get() for k in ['safe_margin_var', 'te_cap_uf_act', 'te_cap_lf_act', 'te_cap_ur_act', 'te_cap_lr_act', 'rc1_act', 'rc2_act', 'diag1_active', 'diag2_active', 'jig_y_positions', 'jig_base_height', 'jig_base_thickness', 'jig_wall_thickness', 'jig_pillar_angle', 'jig_te_stopper_height', 'jig_slot_interval', 'jig_slot_width', 'jig_slot_depth', 'dxf_layer_rib_outline', 'dxf_layer_holes', 'dxf_layer_truss', 'dxf_layer_plank', 'dxf_layer_te_part', 'dxf_layer_jig_outline', 'dxf_all_in_one', 'le_interp_active'] if k in self.pm.vars},
             'dxf_selections': {k: v.get() for k, v in getattr(self, 'dxf_selection_vars', {}).items()},
@@ -126,10 +130,10 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             'xbrace_wire_dia': getattr(self, 'safe_float')(getattr(self, 'xbrace_wire_dia', tk.StringVar(value="28.0"))),
             'bolt_spacer_inner_dia': self.safe_float(getattr(self, 'bolt_spacer_inner_dia', tk.StringVar(value="4.0"))),
             'bolt_spacer_length': self.safe_float(getattr(self, 'bolt_spacer_length', tk.StringVar(value="10.0"))),
-            'root_bolt1': (self.safe_float(self.root_bolt1_dx), self.safe_float(self.root_bolt1_dy), self.safe_float(self.root_bolt1_dia)) if hasattr(self, 'root_bolt1_dx') else (0,0,0),
-            'root_bolt2': (self.safe_float(self.root_bolt2_dx), self.safe_float(self.root_bolt2_dy), self.safe_float(self.root_bolt2_dia)) if hasattr(self, 'root_bolt2_dx') else (0,0,0),
-            'tip_bolt1': (self.safe_float(self.tip_bolt1_dx), self.safe_float(self.tip_bolt1_dy), self.safe_float(self.tip_bolt1_dia)) if hasattr(self, 'tip_bolt1_dx') else (0,0,0),
-            'tip_bolt2': (self.safe_float(self.tip_bolt2_dx), self.safe_float(self.tip_bolt2_dy), self.safe_float(self.tip_bolt2_dia)) if hasattr(self, 'tip_bolt2_dx') else (0,0,0),
+            'root_bolt1': (self.safe_float(self.root_bolt1_dx, default=None), self.safe_float(self.root_bolt1_dy, default=None), self.safe_float(self.root_bolt1_dia, default=-1.0)) if hasattr(self, 'root_bolt1_dx') else (0,0,-1.0),
+            'root_bolt2': (self.safe_float(self.root_bolt2_dx, default=None), self.safe_float(self.root_bolt2_dy, default=None), self.safe_float(self.root_bolt2_dia, default=-1.0)) if hasattr(self, 'root_bolt2_dx') else (0,0,-1.0),
+            'tip_bolt1': (self.safe_float(self.tip_bolt1_dx, default=None), self.safe_float(self.tip_bolt1_dy, default=None), self.safe_float(self.tip_bolt1_dia, default=-1.0)) if hasattr(self, 'tip_bolt1_dx') else (0,0,-1.0),
+            'tip_bolt2': (self.safe_float(self.tip_bolt2_dx, default=None), self.safe_float(self.tip_bolt2_dy, default=None), self.safe_float(self.tip_bolt2_dia, default=-1.0)) if hasattr(self, 'tip_bolt2_dx') else (0,0,-1.0),
             'xb_zones': xb_zones, 'connectors': connectors, 'carbon_rib_configs': carbon_rib_configs, 'joint_sleeves': joint_sleeves,
             'diag1_y_main': diag1_ym, 'diag1_y_rear': diag1_yr, 'diag1_range': (min(diag1_ym, diag1_yr), max(diag1_ym, diag1_yr)) if abs(diag1_yr - diag1_ym) > 1e-5 else (-1,-1),
             'diag2_y_main': diag2_ym, 'diag2_y_rear': diag2_yr, 'diag2_range': (min(diag2_ym, diag2_yr), max(diag2_ym, diag2_yr)) if abs(diag2_yr - diag2_ym) > 1e-5 else (-1,-1),
@@ -141,13 +145,22 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             'truss_tab_width': truss_tab_width,
             'main_spar_support_w': ms_tab_w,
             'main_spar_support_h': ms_tab_d,
-            'main_spar_support_thick': 3.0,
+            'main_spar_support_thick': ms_tab_thick,
             'tab_thickness': getattr(self, 'safe_float')(getattr(self, 'tab_thickness', tk.StringVar(value="3.0")), 3.0),
             'outer_tab_width': getattr(self, 'safe_float')(getattr(self, 'outer_tab_width', tk.StringVar(value="6.0")), 6.0),
             'outer_tab_interval': getattr(self, 'safe_float')(getattr(self, 'outer_tab_interval', tk.StringVar(value="100.0")), 100.0),
             'tab_angle_deg': getattr(self, 'safe_float')(getattr(self, 'tab_angle_deg', tk.StringVar(value="45.0")), 45.0),
             'tab_exclusion_stringer': getattr(self, 'safe_float')(getattr(self, 'tab_exclusion_stringer', tk.StringVar(value="10.0")), 10.0),
             'tab_exclusion_le_te': getattr(self, 'safe_float')(getattr(self, 'tab_exclusion_le_te', tk.StringVar(value="30.0")), 30.0),
+            'cam_tool_dia': getattr(self, 'safe_float')(getattr(self, 'cam_tool_dia', tk.StringVar(value="2.0")), 2.0),
+            'cam_mat_thick': getattr(self, 'safe_float')(getattr(self, 'cam_mat_thick', tk.StringVar(value="10.0")), 10.0),
+            'cam_safe_z': getattr(self, 'safe_float')(getattr(self, 'cam_safe_z', tk.StringVar(value="5.0")), 5.0),
+            'cam_feed_rate': getattr(self, 'safe_float')(getattr(self, 'cam_feed_rate', tk.StringVar(value="2000")), 2000.0),
+            'cam_spindle_speed': getattr(self, 'safe_float')(getattr(self, 'cam_spindle_speed', tk.StringVar(value="12000")), 12000.0),
+            'cam_extra_depth': getattr(self, 'safe_float')(getattr(self, 'cam_extra_depth', tk.StringVar(value="0.5")), 0.5),
+            'cam_milling_dir': getattr(self, 'cam_milling_dir', tk.StringVar(value="Conventional (Outer CW)")).get(),
+            'spar_bridge_padding': getattr(self, 'safe_float')(getattr(self, 'spar_bridge_padding', tk.StringVar(value="0.5")), 0.5),
+            'spar_bridge_thickness': getattr(self, 'safe_float')(getattr(self, 'spar_bridge_thickness', tk.StringVar(value="3.0")), 3.0),
         }
 
     def create_widgets(self):
@@ -167,17 +180,18 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
         self.ui_builder.build_tabs(notebook, self.pm)
         
         # Append custom panels
-        self.create_stringers_ui(self.pm.obj.tabs_frames['PlankTE'])
+        self.create_stringers_ui(self.pm.obj.tabs_frames['プランク・後縁'])
         if hasattr(self, 'create_cam_ui'):
             self.create_cam_ui(notebook)
             
-        # Add Generate Positions button into Wing Tab
-        if 'Wing' in self.pm.obj.tabs_frames:
-            ttk.Button(self.pm.obj.tabs_frames['Wing'], text="Generate Positions", command=self.calculate_y_positions).pack(fill=tk.X, padx=10, pady=5)
+
         
 
-        if 'Cross Bracing' in self.pm.obj.groups_frames:
-            ttk.Button(self.pm.obj.groups_frames['Cross Bracing'], text="Auto Set X-Brace", command=self.auto_set_xbrace_zones).grid(row=99, column=0, columnspan=4, pady=5)
+        if '翼全体' in self.pm.obj.tabs_frames:
+            ttk.Button(self.pm.obj.tabs_frames['翼全体'], text="Generate Positions", command=self.calculate_y_positions).pack(fill=tk.X, padx=10, pady=5)
+
+        if 'Xブレース' in self.pm.obj.groups_frames:
+            ttk.Button(self.pm.obj.groups_frames['Xブレース'], text="自動設定", command=self.auto_set_xbrace_zones).grid(row=99, column=0, columnspan=4, pady=5)
             
         if 'CNC' in self.pm.obj.tabs_frames:
             self.create_cnc_selection_ui(self.pm.obj.tabs_frames['CNC'])
@@ -185,18 +199,18 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             
         if 'Foam' in self.pm.obj.tabs_frames:
             f_tab = self.pm.obj.tabs_frames['Foam']
-            lf = ttk.LabelFrame(f_tab, text="Cutout Range (Ribs)")
+            lf = ttk.LabelFrame(f_tab, text="切り出し範囲")
             lf.pack(fill=tk.X, padx=10, pady=5)
             
-            ttk.Label(lf, text="Start Rib:").grid(row=0, column=0, padx=5, pady=2, sticky="e")
+            ttk.Label(lf, text="開始リブ:").grid(row=0, column=0, padx=5, pady=2, sticky="e")
             self.combo_foam_start = ttk.Combobox(lf, state="readonly", width=25)
             self.combo_foam_start.grid(row=0, column=1, padx=5, pady=2, sticky="w")
             
-            ttk.Label(lf, text="End Rib:").grid(row=1, column=0, padx=5, pady=2, sticky="e")
+            ttk.Label(lf, text="終了リブ:").grid(row=1, column=0, padx=5, pady=2, sticky="e")
             self.combo_foam_end = ttk.Combobox(lf, state="readonly", width=25)
             self.combo_foam_end.grid(row=1, column=1, padx=5, pady=2, sticky="w")
             
-            ttk.Button(f_tab, text="Open in Foam CAM", command=self.open_in_foam_cam).pack(fill=tk.X, padx=10, pady=5)
+            ttk.Button(f_tab, text="Foam CAMを開く", command=self.open_in_foam_cam).pack(fill=tk.X, padx=10, pady=5)
             
         if 'DXF' in self.pm.obj.tabs_frames:
             self.create_dxf_selection_ui(self.pm.obj.tabs_frames['DXF'])
@@ -243,10 +257,13 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
         self.canvas = FigureCanvasTkAgg(self.fig, master=lf_preview)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         
-        for var in self.pm.vars.values():
+        for name, var in self.pm.vars.items():
             if hasattr(var, 'trace_add'):
-                try: var.trace_add("write", lambda *args: self.update_preview_fast())
+                try:
+                    var.trace_add("write", lambda *args: self.update_preview_fast())
                 except: pass
+
+        notebook.bind("<<NotebookTabChanged>>", lambda e: [self.calculate_y_positions(), self.update_preview_full()]) if hasattr(self, 'combo_rib') else None
 
     def browse_file(self, var, is_dxf=False):
         super().browse_file(var, is_dxf)
