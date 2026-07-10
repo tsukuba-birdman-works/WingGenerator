@@ -506,7 +506,7 @@ class RibGeneratorEngine:
             r_w = ur_w if is_upper else lr_w
             
             zones = []
-            if f_act and f_w > 0: zones.append((te_start + f_w, te_start + 0.01, True))
+            if f_act and f_w > 0: zones.append((te_cut + f_w, te_cut, True))
             if r_act and r_w > 0: zones.append((r_w, 0.0, False))
             
             for start_d, end_d, is_front in zones:
@@ -516,7 +516,7 @@ class RibGeneratorEngine:
                 p_end = np.array([np.interp(end_d, dist_arr, pts_rev[:, 0]), np.interp(end_d, dist_arr, pts_rev[:, 1])])
                 
                 mask = (dist_arr < start_d) & (dist_arr > end_d)
-                inner_pts = pts_rev[mask][::-1]
+                inner_pts = pts_rev[mask]
                 
                 surf_pts = [p_start]
                 if len(inner_pts) > 0: surf_pts.extend(inner_pts)
