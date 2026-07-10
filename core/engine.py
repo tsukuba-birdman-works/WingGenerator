@@ -506,7 +506,7 @@ class RibGeneratorEngine:
             r_w = ur_w if is_upper else lr_w
             
             zones = []
-            if f_act and f_w > 0: zones.append((te_start, max(0.0, te_start - f_w), True))
+            if f_act and f_w > 0: zones.append((te_start + f_w, te_start + 0.01, True))
             if r_act and r_w > 0: zones.append((r_w, 0.0, False))
             
             for start_d, end_d, is_front in zones:

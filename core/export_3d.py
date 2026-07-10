@@ -935,8 +935,8 @@ class Wing3DExporter:
                 except:
                     return None
 
-            cap1 = make_cap(aligned_curves[0], flip_normal=True)
-            cap2 = make_cap(aligned_curves[-1], flip_normal=False)
+            cap1 = make_cap(aligned_curves[0], flip_normal=False)
+            cap2 = make_cap(aligned_curves[-1], flip_normal=True)
             
             meshes = [mesh]
             if cap1: meshes.append(cap1)
