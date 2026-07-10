@@ -263,7 +263,26 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
                     var.trace_add("write", lambda *args: self.update_preview_fast())
                 except: pass
 
-        notebook.bind("<<NotebookTabChanged>>", lambda e: [self.calculate_y_positions(), self.update_preview_full()]) if hasattr(self, 'combo_rib') else None
+        def _on_tab_changed(e):
+            if not hasattr(self, 'combo_rib'): return
+            current_tab_id = e.widget.select()
+            current_tab_name = e.widget.tab(current_tab_id, "text")
+            prev_tab = getattr(self, '_prev_tab_name', None)
+            
+            # Track relevant params for calculating positions
+            curr_p = (self.safe_float(self.wing_span), self.safe_float(self.rib_interval), self.safe_float(self.joint_length))
+            last_p = getattr(self, '_last_calc_params', None)
+            
+            # Recalculate only if we just left '翼全体' and params changed
+            if prev_tab == '翼全体' and current_tab_name != '翼全体':
+                if last_p != curr_p:
+                    self.calculate_y_positions()
+                    self._last_calc_params = curr_p
+                    self.update_preview_full()
+            
+            self._prev_tab_name = current_tab_name
+
+        notebook.bind("<<NotebookTabChanged>>", _on_tab_changed)
 
     def browse_file(self, var, is_dxf=False):
         super().browse_file(var, is_dxf)
