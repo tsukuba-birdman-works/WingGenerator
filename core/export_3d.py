@@ -510,6 +510,10 @@ class Wing3DExporter:
         meshes = []
         last_err = ""
 
+        min_y = min(d[0] for d in rib_data_list) if rib_data_list else 0
+        max_y = max(d[0] for d in rib_data_list) if rib_data_list else 0
+
+
         for data in rib_data_list:
             if len(data) == 4:
                 y_global, thickness, ext_pts, holes = data
@@ -554,9 +558,18 @@ class Wing3DExporter:
                                 # 前縁側(minx)と後縁側(maxx)を伸ばして後縁ブロックとCoplanarになるのを防ぐ
                                 bbox = box(minx - 2.0, -9999, maxx + 2.0, 9999)
                                 inflated_p = inflated_p.intersection(bbox)
-                                cutter_mesh = trimesh.creation.extrude_polygon(inflated_p, height=thickness)
+                                # 端のリブ（ルートまたは翼端）の場合、Y軸方向にカッターを少し（1mm）伸ばしてCoplanarを回避する
+                                cutter_height = thickness
+                                cutter_y = y_global
+                                if abs(y_global - min_y) < 1e-3:
+                                    cutter_height += 1.0
+                                    cutter_y -= 1.0
+                                if abs(y_global - max_y) < 1e-3:
+                                    cutter_height += 1.0
+
+                                cutter_mesh = trimesh.creation.extrude_polygon(inflated_p, height=cutter_height)
                                 cutter_mesh.apply_transform(swap_yz)
-                                cutter_mesh.apply_translation([0, y_global, 0])
+                                cutter_mesh.apply_translation([0, cutter_y, 0])
                                 meshes.append((cutter_mesh, mat_key + "_Cutter"))
                             except Exception as e:
                                 print("Cutter extrude error:", e)
