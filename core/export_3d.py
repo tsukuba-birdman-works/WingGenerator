@@ -887,7 +887,9 @@ class Wing3DExporter:
                 if all_same_len and max_len <= 10:
                     c_res = c
                 else:
-                    c_res = resample_closed(c, max_len)
+                    # Foam cutter uses a large target_count (>=100) to ensure corners aren't skipped.
+                    # We use max(max_len, 50) here to guarantee enough resolution for corner protection.
+                    c_res = resample_closed(c, max(max_len, 50))
                     
                 if np.linalg.norm(c_res[0] - c_res[-1]) > 1e-5:
                     c_res = np.vstack([c_res, c_res[0]])
