@@ -853,6 +853,21 @@ class Wing3DExporter:
                 if np.linalg.norm(valid_curves[i][0] - valid_curves[i][-1]) > 1e-5:
                     valid_curves[i] = np.vstack([valid_curves[i], valid_curves[i][0]])
                     
+                # Remove collinear points to preserve exact polygonal corners (essential for TE_Skin / Planks)
+                c = valid_curves[i]
+                simplified = [c[0]]
+                for j in range(1, len(c)-1):
+                    v1 = c[j] - simplified[-1]
+                    v2 = c[j+1] - c[j]
+                    n1 = np.linalg.norm(v1)
+                    n2 = np.linalg.norm(v2)
+                    if n1 > 1e-5 and n2 > 1e-5:
+                        cos_th = np.clip(np.dot(v1, v2) / (n1 * n2), -1.0, 1.0)
+                        if np.arccos(cos_th) > 1e-3: # Not strictly collinear
+                            simplified.append(c[j])
+                simplified.append(c[-1])
+                valid_curves[i] = np.array(simplified)
+
             max_len = max(len(c) for c in valid_curves)
 
             def resample_closed(curve, n):
