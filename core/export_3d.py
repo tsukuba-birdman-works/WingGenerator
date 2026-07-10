@@ -549,10 +549,10 @@ class Wing3DExporter:
                         if mat_key in ['Ribs', 'CarbonRibs']:
                             try:
                                 from shapely.geometry import box
-                                inflated_p = p_simp.buffer(1.0)
+                                inflated_p = p_simp.simplify(0.1, preserve_topology=True).buffer(1.0, resolution=2).simplify(0.1, preserve_topology=True)
                                 minx, miny, maxx, maxy = p_simp.bounds
-                                # 前縁側(minx)を2mm伸ばして後縁ブロックとCoplanarになるのを防ぐ。後縁側(maxx)はそのまま。
-                                bbox = box(minx - 2.0, -9999, maxx, 9999)
+                                # 前縁側(minx)と後縁側(maxx)を伸ばして後縁ブロックとCoplanarになるのを防ぐ
+                                bbox = box(minx - 2.0, -9999, maxx + 2.0, 9999)
                                 inflated_p = inflated_p.intersection(bbox)
                                 cutter_mesh = trimesh.creation.extrude_polygon(inflated_p, height=thickness)
                                 cutter_mesh.apply_transform(swap_yz)
@@ -629,7 +629,7 @@ class Wing3DExporter:
                         except Exception as e:
                             print("Scaling sub error:", e)
                             extended_subs.append(sub)
-                    m = Wing3DExporter.blender_difference(m, extended_subs)
+                    m = Wing3DExporter.blender_difference(m, extended_subs, solver='FAST')
                 c = [200, 200, 200, 255]
                 for k, v in part_colors.items():
                     if name.startswith(k):
@@ -962,7 +962,7 @@ class Wing3DExporter:
             return None
 
     @staticmethod
-    def blender_difference(base_mesh, subtract_meshes):
+    def blender_difference(base_mesh, subtract_meshes, solver='EXACT'):
         """
         Performs a boolean difference using Blender: base_mesh - union(subtract_meshes)
         """
@@ -1045,10 +1045,10 @@ class Wing3DExporter:
                 "    bpy.ops.object.select_all(action='DESELECT')",
                 "    base_obj.select_set(True)",
                 "    bpy.context.view_layer.objects.active = base_obj",
-                "    mod = base_obj.modifiers.new('bool_joined', 'BOOLEAN')",
+                "    mod = base_obj.modifiers.new(name='Boolean', type='BOOLEAN')",
                 "    mod.object = joined_sub",
                 "    mod.operation = 'DIFFERENCE'",
-                "    mod.solver = 'EXACT'",
+                f"    mod.solver = '{solver}'",
                 "    bpy.ops.object.modifier_apply(modifier=mod.name)",
                 "    bpy.ops.object.select_all(action='DESELECT')",
                 "    joined_sub.select_set(True)",
