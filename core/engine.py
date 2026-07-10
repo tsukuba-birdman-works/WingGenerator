@@ -516,7 +516,7 @@ class RibGeneratorEngine:
                 p_end = np.array([np.interp(end_d, dist_arr, pts_rev[:, 0]), np.interp(end_d, dist_arr, pts_rev[:, 1])])
                 
                 mask = (dist_arr < start_d) & (dist_arr > end_d)
-                inner_pts = pts_rev[mask]
+                inner_pts = pts_rev[mask][::-1]
                 
                 surf_pts = [p_start]
                 if len(inner_pts) > 0: surf_pts.extend(inner_pts)
