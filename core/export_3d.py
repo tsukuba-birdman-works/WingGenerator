@@ -545,6 +545,22 @@ class Wing3DExporter:
                         mesh.apply_transform(swap_yz)
                         mesh.apply_translation([0, y_global, 0])
                         meshes.append((mesh, mat_key))
+
+                        if mat_key in ['Ribs', 'CarbonRibs']:
+                            try:
+                                from shapely.geometry import box
+                                inflated_p = p_simp.buffer(1.0)
+                                minx, miny, maxx, maxy = p_simp.bounds
+                                # 前縁側(minx)を2mm伸ばして後縁ブロックとCoplanarになるのを防ぐ。後縁側(maxx)はそのまま。
+                                bbox = box(minx - 2.0, -9999, maxx, 9999)
+                                inflated_p = inflated_p.intersection(bbox)
+                                cutter_mesh = trimesh.creation.extrude_polygon(inflated_p, height=thickness)
+                                cutter_mesh.apply_transform(swap_yz)
+                                cutter_mesh.apply_translation([0, y_global, 0])
+                                meshes.append((cutter_mesh, mat_key + "_Cutter"))
+                            except Exception as e:
+                                print("Cutter extrude error:", e)
+
                     except Exception as e: last_err = str(e); print("Extrude Error:", e)
             except Exception as e: last_err = str(e); print("Extrude Error:", e)
 
@@ -587,7 +603,8 @@ class Wing3DExporter:
             apply_color(rc_mesh, c)
             scene_geoms['Rib_Cap'] = rc_mesh
 
-        rib_sub_meshes = ribs_m_list + carbon_m_list
+        cutter_m_list = [m for m, k in meshes if k in ['Ribs_Cutter', 'CarbonRibs_Cutter']]
+        rib_sub_meshes = cutter_m_list if cutter_m_list else ribs_m_list + carbon_m_list
         for name, m in other_meshes.items():
             if m is not None:
                 if name == "TE_Skin" and rib_sub_meshes:
@@ -600,26 +617,12 @@ class Wing3DExporter:
                             t = y_max - y_min
                             if t > 1e-5:
                                 scale = (t + 2.0) / t
-                                x_min, x_max = sub_ext.bounds[:, 0]
-                                z_min, z_max = sub_ext.bounds[:, 2]
-                                x_center = (x_min + x_max) / 2.0
-                                z_center = (z_min + z_max) / 2.0
-                                
                                 t1 = np.eye(4)
-                                t1[0, 3] = -x_center
                                 t1[1, 3] = -y_center
-                                t1[2, 3] = -z_center
-                                
                                 s_mat = np.eye(4)
-                                s_mat[0, 0] = 1.02  # 少し前後に伸ばして薄皮を防ぐ
-                                s_mat[1, 1] = scale # 幅を広げる
-                                s_mat[2, 2] = 1.02  # 少し上下に伸ばして薄皮を防ぐ
-                                
+                                s_mat[1, 1] = scale # Y方向のみ拡大
                                 t2 = np.eye(4)
-                                t2[0, 3] = x_center
                                 t2[1, 3] = y_center
-                                t2[2, 3] = z_center
-                                
                                 mat = t2 @ s_mat @ t1
                                 sub_ext.apply_transform(mat)
                             extended_subs.append(sub_ext)
