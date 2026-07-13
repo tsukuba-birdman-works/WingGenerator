@@ -693,9 +693,11 @@ class RibGeneratorEngine:
                             canvas = canvas.buffer(0).difference(safe_webs).buffer(0)
                         except Exception: pass
                     
-                    for p in ([canvas] if getattr(canvas, 'geom_type', '') == 'Polygon' else list(getattr(canvas, 'geoms', []))):
-                        if getattr(p, 'geom_type', '') == 'Polygon' and p.area > 5.0:
-                            sharp_polys.append((p, is_rear, idx))
+                    polys = [p for p in ([canvas] if getattr(canvas, 'geom_type', '') == 'Polygon' else list(getattr(canvas, 'geoms', [])))
+                             if getattr(p, 'geom_type', '') == 'Polygon' and p.area > 5.0]
+                    polys.sort(key=lambda p: abs(p.centroid.x - spar_x))
+                    for idx, p in enumerate(polys):
+                        sharp_polys.append((p, is_rear, idx))
 
         process_side(blocks_f, is_rear=False)
         process_side(blocks_r, is_rear=True)
