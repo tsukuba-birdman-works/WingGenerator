@@ -228,6 +228,8 @@ SINGLE_PARAMS = [
     {'id': 'truss_fillet', 'type': 'float', 'default': 1.0, 'tab': 'リブ', 'group': 'Truss & Margins', 'label': 'Truss Fillet R (mm)', 'widget': 'entry'},
     {'id': 'truss_front_n', 'type': 'int', 'default': 2, 'tab': 'リブ', 'group': 'Truss & Margins', 'label': 'Front Truss N', 'widget': 'entry'},
     {'id': 'truss_rear_n', 'type': 'int', 'default': 4, 'tab': 'リブ', 'group': 'Truss & Margins', 'label': 'Rear Truss N', 'widget': 'entry'},
+    {'id': 'truss_scale_front', 'type': 'str', 'default': '', 'tab': 'リブ', 'group': 'Truss & Margins', 'label': 'Front Truss Scale(csv)', 'widget': 'entry'},
+    {'id': 'truss_scale_rear', 'type': 'str', 'default': '', 'tab': 'リブ', 'group': 'Truss & Margins', 'label': 'Rear Truss Scale(csv)', 'widget': 'entry'},
     {'id': 'safe_margin_var', 'type': 'bool', 'default': True, 'tab': 'リブ', 'group': 'Truss & Margins', 'label': 'Safe Margin', 'widget': 'checkbutton'},
 
     # --- Jig Tab ---

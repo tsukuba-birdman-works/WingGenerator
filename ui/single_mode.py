@@ -65,6 +65,8 @@ class RibGeneratorGUI_Single(BaseRibGeneratorGUI):
             truss_angle=self.safe_float(self.base_truss_angle),
             truss_front_n=self.safe_int(self.truss_front_n),
             truss_rear_n=self.safe_int(self.truss_rear_n),
+            truss_scale_front_list=[float(x) for x in self.truss_scale_front.get().split(',') if x.strip()] if hasattr(self, 'truss_scale_front') else [],
+            truss_scale_rear_list=[float(x) for x in self.truss_scale_rear.get().split(',') if x.strip()] if hasattr(self, 'truss_scale_rear') else [],
             beam_width=self.safe_float(self.beam_width),
             margin_spar=self.safe_float(self.margin_spar),
             margin_bolt=self.safe_float(self.margin_bolt),
