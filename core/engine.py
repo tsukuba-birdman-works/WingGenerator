@@ -42,6 +42,7 @@ class RibParameters:
     truss_angle: float
     truss_front_n: int
     truss_rear_n: int
+
     beam_width: float
     margin_spar: float
     margin_bolt: float
@@ -79,6 +80,8 @@ class RibParameters:
     rc2_end: float
     rc2_thick: float
     bolt1_dx: float = 0.0
+    truss_scale_front_list: List[float] = field(default_factory=list)
+    truss_scale_rear_list: List[float] = field(default_factory=list)
     bolt1_dy: float = 0.0
     bolt1_dia: float = 0.0
     bolt2_dx: float = 0.0
@@ -692,7 +695,7 @@ class RibGeneratorEngine:
                     
                     for p in ([canvas] if getattr(canvas, 'geom_type', '') == 'Polygon' else list(getattr(canvas, 'geoms', []))):
                         if getattr(p, 'geom_type', '') == 'Polygon' and p.area > 5.0:
-                            sharp_polys.append(p)
+                            sharp_polys.append((p, is_rear, idx))
 
         process_side(blocks_f, is_rear=False)
         process_side(blocks_r, is_rear=True)
@@ -766,6 +769,8 @@ class RibGeneratorEngine:
         truss_angle = p.truss_angle
         truss_front_n = p.truss_front_n
         truss_rear_n = p.truss_rear_n
+        truss_scale_front_list = p.truss_scale_front_list
+        truss_scale_rear_list = p.truss_scale_rear_list
         beam_width = p.beam_width
         margin_spar = p.margin_spar
         margin_bolt = p.margin_bolt
@@ -1036,7 +1041,7 @@ class RibGeneratorEngine:
                             if xb_poly.is_valid and xb_obs.is_valid:
                                 xb = {'abs_ct': ct, 'poly': xb_poly, 'obs': xb_obs}
                                 is_contained = False
-                                for p in h_polys_sharp:
+                                for p, _, _ in h_polys_sharp:
                                     try:
                                         if p.contains(xb_poly):
                                             is_contained = True
@@ -1121,7 +1126,7 @@ class RibGeneratorEngine:
                         cleaned_obs.append(c_o)
                 except: pass
                 
-            for raw_p in h_polys_sharp:
+            for raw_p, is_rear, b_idx in h_polys_sharp:
                 try: p = raw_p.buffer(0)
                 except: continue
                 
@@ -1136,7 +1141,7 @@ class RibGeneratorEngine:
                         hit_obs.append(obs)
 
                 if not hit_obs:
-                    final_sharp_polys.append(p)
+                    final_sharp_polys.append((p, is_rear, b_idx))
                     continue
 
                 best_scaled_p = None
@@ -1212,7 +1217,7 @@ class RibGeneratorEngine:
                             best_k = ans_k 
 
                 if best_scaled_p and best_scaled_area > 5.0:
-                    final_sharp_polys.append(best_scaled_p)
+                    final_sharp_polys.append((best_scaled_p, is_rear, b_idx))
         else:
             final_sharp_polys = h_polys_sharp
 
@@ -1241,11 +1246,21 @@ class RibGeneratorEngine:
                 except Exception:
                     final_truss_holes.append(np.array(poly.exterior.coords))
 
-            for p in final_sharp_polys:
+            for p_data in final_sharp_polys:
                 try:
+                    p, is_rear, b_idx = p_data
                     p_clean = p.buffer(0)
                     if p_clean.is_empty: continue
                     
+                    scale_list = truss_scale_rear_list if is_rear else truss_scale_front_list
+                    factor = scale_list[b_idx] if b_idx < len(scale_list) else 1.0
+                    if factor != 1.0:
+                        import math
+                        r_approx = math.sqrt(p_clean.area / math.pi)
+                        offset_val = r_approx * (1.0 - factor)
+                        p_clean = p_clean.buffer(-offset_val).buffer(0)
+                        if p_clean.is_empty: continue
+
                     if truss_fillet > 0:
                         rp = p_clean.buffer(-truss_fillet).buffer(truss_fillet).buffer(0)
                         if getattr(rp, 'geom_type', '') == 'Polygon' and rp.area > 0.1:
@@ -1388,6 +1403,8 @@ class RibGeneratorEngine:
             spar_hole_dia=p['spar_hole_dia'], spar_hole_dv=p.get('spar_hole_dv', 0.0) or p['spar_hole_dia'], rear_dx=rear_dx, rear_dy=rear_dy, rear_dia=p['rear_spar_dia'],
             front_dx=front_dx, front_dy=front_dy, front_dia=p['front_spar_dia'],
             truss_angle=angle, truss_front_n=p['truss_front_n'], truss_rear_n=p['truss_rear_n'],
+            truss_scale_front_list=[float(x) for x in str(p.get('truss_scale_front', '')).split(',') if x.strip()],
+            truss_scale_rear_list=[float(x) for x in str(p.get('truss_scale_rear', '')).split(',') if x.strip()],
             beam_width=active_beam, margin_spar=p['margin_spar'], margin_bolt=p['margin_bolt'], margin_outer=active_margin,
             truss_fillet=p['truss_fillet'], min_hole_dia=p['min_hole_dia'], xb_t_list=xb_t_list, x_dia=x_dia,
             plank_start=p['plank_start'], plank_end=p['plank_end'],

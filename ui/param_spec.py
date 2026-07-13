@@ -69,6 +69,8 @@ BATCH_PARAMS = [
     {'id': 'min_hole_dia', 'type': 'float', 'default': 0.0, 'tab': 'リブ', 'group': 'Truss & Margins', 'label': '最小穴径', 'widget': 'entry'},
     {'id': 'truss_front_n', 'type': 'float', 'default': 0.0, 'tab': 'リブ', 'group': 'Truss & Margins', 'label': '前縁トラス数', 'widget': 'entry'},
     {'id': 'truss_rear_n', 'type': 'float', 'default': '60.0', 'tab': 'リブ', 'group': 'Truss & Margins', 'label': '後縁トラス数', 'widget': 'entry'},
+    {'id': 'truss_scale_front', 'type': 'str', 'default': '', 'tab': 'リブ', 'group': 'Truss & Margins', 'label': '前縁トラス個別縮小(カンマ区切り)', 'widget': 'entry'},
+    {'id': 'truss_scale_rear', 'type': 'str', 'default': '', 'tab': 'リブ', 'group': 'Truss & Margins', 'label': '後縁トラス個別縮小(カンマ区切り)', 'widget': 'entry'},
     {'id': 'truss_fillet', 'type': 'float', 'default': 0.0, 'tab': 'リブ', 'group': 'Truss & Margins', 'label': 'フィレット半径', 'widget': 'entry'},
     {'id': 'cr_root_in_act', 'type': 'bool', 'default': False, 'tab': 'リブ', 'group': '翼根カーボンリブ', 'label': 'Inner Active', 'widget': 'checkbutton'},
     {'id': 'cr_root_out_act', 'type': 'bool', 'default': False, 'tab': 'リブ', 'group': '翼根カーボンリブ', 'label': 'Outer Active', 'widget': 'checkbutton'},
