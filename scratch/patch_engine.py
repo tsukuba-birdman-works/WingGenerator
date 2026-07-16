@@ -1,54 +1,77 @@
-import re
+with open("core/engine.py", "r") as f:
+    code = f.read()
 
-with open('core/engine.py', 'r') as f:
-    content = f.read()
+# Replace process_blocks_sharp inner loop
+old_code = """
+        def process_side(blocks, is_rear):
+            for b in blocks:
+                for idx, b_item in enumerate(b):
+                    if not b_item: continue
+                    rb = [( (np.array(l[0])-[spar_x, spar_y]).dot(R_mat.T)+[spar_x, spar_y],
+                            (np.array(l[1])-[spar_x, spar_y]).dot(R_mat.T)+[spar_x, spar_y] ) for l in b_item]
 
-# We need to replace the te_part_coords block
-search = """            te_part_coords = []
-            if final_rib_mod_poly and P_u_rot is not None and P_l_rot is not None:
-                main_poly = self.cut_polygon_by_line(final_rib_mod_poly, P_u_rot, P_l_rot, 'left')
-                te_poly = self.cut_polygon_by_line(final_rib_mod_poly, P_u_rot_te, P_l_rot_te, 'right')
-                final_rib_mod_poly = main_poly
-                if getattr(te_poly, 'is_empty', True) == False:
-                    te_part_coords = np.array(te_poly.exterior.coords)"""
+                    c1, c2 = ('right', 'left') if is_rear else ('left', 'right')
+                    canvas = self.cut_polygon_by_line(inner_poly, rb[0][0], rb[0][1], c1)
+                    canvas = self.cut_polygon_by_line(canvas, rb[-1][0], rb[-1][1], c2)
 
-replace = """            te_part_coords = []
-            if final_rib_mod_poly and P_u_rot is not None and P_l_rot is not None:
-                main_poly = self.cut_polygon_by_line(final_rib_mod_poly, P_u_rot, P_l_rot, 'left')
-                final_rib_mod_poly = main_poly
-                
-                # Generate native topologically-perfect TE Part
-                if te_cut > 0:
-                    num_pts = 25
-                    u_pts_rev = np.column_stack((u_x_mod[::-1], u_y_mod[::-1]))
-                    l_pts_rev = np.column_stack((l_x_mod[::-1], l_y_mod[::-1]))
-                    
-                    dist_u = np.zeros(len(u_pts_rev))
-                    dist_u[1:] = np.cumsum(np.linalg.norm(np.diff(u_pts_rev, axis=0), axis=1))
-                    
-                    dist_l = np.zeros(len(l_pts_rev))
-                    dist_l[1:] = np.cumsum(np.linalg.norm(np.diff(l_pts_rev, axis=0), axis=1))
-                    
-                    targets_u = np.linspace(0, te_cut, num_pts)
-                    targets_l = np.linspace(te_cut, 0, num_pts)
-                    
-                    te_u_x = np.interp(targets_u, dist_u, u_pts_rev[:, 0])
-                    te_u_y = np.interp(targets_u, dist_u, u_pts_rev[:, 1])
-                    
-                    te_l_x = np.interp(targets_l, dist_l, l_pts_rev[:, 0])
-                    te_l_y = np.interp(targets_l, dist_l, l_pts_rev[:, 1])
-                    
-                    te_unrot = np.column_stack((
-                        np.concatenate((te_u_x, te_l_x[1:])),
-                        np.concatenate((te_u_y, te_l_y[1:]))
-                    ))
-                    
-                    te_part_coords = (te_unrot - [spar_x, spar_y]).dot(R_mat.T) + [spar_x, spar_y]"""
+                    webs = []
+                    for l in rb[1:-1]:
+                        p1, p2 = np.array(l[0]), np.array(l[1])
+                        vec = p2 - p1
+                        if np.linalg.norm(vec) > 0:
+                            vec = vec / np.linalg.norm(vec)
+                            w_line = LineString([p1 - vec * 10000, p2 + vec * 10000])
+                            try: webs.append(w_line.buffer(beam_width / 2.0).buffer(0))
+                            except Exception: pass
 
-if search in content:
-    content = content.replace(search, replace)
-    with open('core/engine.py', 'w') as f:
-        f.write(content)
-    print("Patched engine.py")
+                    if webs:
+                        try:
+                            safe_webs = unary_union(webs).buffer(0)
+                            canvas = canvas.buffer(0).difference(safe_webs).buffer(0)
+                        except Exception: pass
+
+                    for p in ([canvas] if getattr(canvas, 'geom_type', '') == 'Polygon' else list(getattr(canvas, 'geoms', []))):
+                        if getattr(p, 'geom_type', '') == 'Polygon' and p.area > 5.0:
+                            sharp_polys.append(p)
+"""
+
+new_code = """
+        def process_side(blocks, is_rear):
+            for b in blocks:
+                for idx, b_item in enumerate(b):
+                    if not b_item: continue
+                    rb = [( (np.array(l[0])-[spar_x, spar_y]).dot(R_mat.T)+[spar_x, spar_y],
+                            (np.array(l[1])-[spar_x, spar_y]).dot(R_mat.T)+[spar_x, spar_y] ) for l in b_item]
+
+                    c1, c2 = ('right', 'left') if is_rear else ('left', 'right')
+                    canvas = self.cut_polygon_by_line(inner_poly, rb[0][0], rb[0][1], c1)
+                    canvas = self.cut_polygon_by_line(canvas, rb[-1][0], rb[-1][1], c2)
+
+                    webs = []
+                    for l in rb[1:-1]:
+                        p1, p2 = np.array(l[0]), np.array(l[1])
+                        vec = p2 - p1
+                        if np.linalg.norm(vec) > 0:
+                            vec = vec / np.linalg.norm(vec)
+                            w_line = LineString([p1 - vec * 10000, p2 + vec * 10000])
+                            try: webs.append(w_line.buffer(beam_width / 2.0).buffer(0))
+                            except Exception: pass
+
+                    if webs:
+                        try:
+                            safe_webs = unary_union(webs).buffer(0)
+                            canvas = canvas.buffer(0).difference(safe_webs).buffer(0)
+                        except Exception: pass
+
+                    for p in ([canvas] if getattr(canvas, 'geom_type', '') == 'Polygon' else list(getattr(canvas, 'geoms', []))):
+                        if getattr(p, 'geom_type', '') == 'Polygon' and p.area > 5.0:
+                            sharp_polys.append((p, is_rear, idx))
+"""
+if old_code in code:
+    code = code.replace(old_code, new_code)
+    with open("core/engine.py", "w") as f:
+        f.write(code)
+    print("Replaced process_side")
 else:
-    print("Could not find search block")
+    print("process_side not found")
+

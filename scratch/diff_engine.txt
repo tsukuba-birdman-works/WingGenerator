@@ -1,0 +1,241 @@
+diff --git a/core/engine.py b/core/engine.py
+index 057f12d..57c8f89 100755
+--- a/core/engine.py
++++ b/core/engine.py
+@@ -506,7 +506,7 @@ class RibGeneratorEngine:
+             r_w = ur_w if is_upper else lr_w
+             
+             zones = []
+-            if f_act and f_w > 0: zones.append((te_start, max(0.0, te_start - f_w), True))
++            if f_act and f_w > 0: zones.append((te_start + f_w, te_start + 0.01, True))
+             if r_act and r_w > 0: zones.append((r_w, 0.0, False))
+             
+             for start_d, end_d, is_front in zones:
+@@ -516,7 +516,7 @@ class RibGeneratorEngine:
+                 p_end = np.array([np.interp(end_d, dist_arr, pts_rev[:, 0]), np.interp(end_d, dist_arr, pts_rev[:, 1])])
+                 
+                 mask = (dist_arr < start_d) & (dist_arr > end_d)
+-                inner_pts = pts_rev[mask]
++                inner_pts = pts_rev[mask][::-1]
+                 
+                 surf_pts = [p_start]
+                 if len(inner_pts) > 0: surf_pts.extend(inner_pts)
+@@ -966,7 +966,7 @@ class RibGeneratorEngine:
+         maxx_guide = max(np.max(u_x_guide), np.max(l_x_guide))
+         
+         dh_prot = spar_hole_dia/2.0 + margin_spar
+-        dv_prot = spar_hole_dv/2.0 + margin_spar if spar_hole_dv > 0 else dh_prot
++        dv_prot = spar_hole_dv/2.0 + margin_spar if spar_hole_dv >= 0 else dh_prot
+ 
+         start_x_f = self.get_start_x(spar_x, spar_y, dh_prot, dv_prot, truss_angle, -1, False, u_x_guide, u_y_guide, l_x_guide, l_y_guide, minx_guide)
+         b_f_ideal = self.generate_zigzag_raw(start_x_f, truss_front_n + 1, -1, truss_angle, False, u_x_guide, u_y_guide, l_x_guide, l_y_guide, minx_guide)
+@@ -992,28 +992,28 @@ class RibGeneratorEngine:
+                 except: pass
+                 return None
+ 
+-            if bolt1_dia > 0:
++            if bolt1_dia >= 0:
+                 b_b1 = safe_buffer_obs(Point(c_b1), bolt1_dia/2.0 + margin_bolt)
+                 if b_b1: active_obs_list.append(b_b1)
+-            if bolt2_dia > 0:
++            if bolt2_dia >= 0:
+                 b_b2 = safe_buffer_obs(Point(c_b2), bolt2_dia/2.0 + margin_bolt)
+                 if b_b2: active_obs_list.append(b_b2)
+-            if spar_hole_dia > 0:
++            if spar_hole_dia >= 0:
+                 # 楕円穴ポリゴンを生成（margin_spar分膨らませる）
+                 theta_c = np.linspace(0, 2 * np.pi, 100)
+                 dh = spar_hole_dia
+-                dv = spar_hole_dv if spar_hole_dv > 0 else dh
++                dv = spar_hole_dv if spar_hole_dv >= 0 else dh
+                 ellipse_m = np.column_stack((c_m[0] + dh/2*np.cos(theta_c), c_m[1] + dv/2*np.sin(theta_c)))
+                 b_m = safe_buffer_obs(Polygon(ellipse_m), margin_spar)
+                 if b_m: active_obs_list.append(b_m)
+-            if front_dia > 0:
++            if front_dia >= 0:
+                 b_f = safe_buffer_obs(Point(c_f), front_dia/2.0 + margin_spar)
+                 if b_f: active_obs_list.append(b_f)
+-            if rear_dia > 0:
++            if rear_dia >= 0:
+                 b_r = safe_buffer_obs(Point(c_r), rear_dia/2.0 + margin_spar)
+                 if b_r: active_obs_list.append(b_r)
+             
+-            if x_dia > 0:
++            if x_dia >= 0:
+                 vec = c_r - c_m
+                 dist_L = np.linalg.norm(vec)
+                 if dist_L > 0:
+@@ -1274,14 +1274,14 @@ class RibGeneratorEngine:
+                 warnings_list.append("Rib shape is invalid!")
+ 
+         theta_c = np.linspace(0, 2 * np.pi, 100)
+-        hole_m = np.column_stack((c_m[0] + spar_hole_dia/2*np.cos(theta_c), c_m[1] + spar_hole_dv/2*np.sin(theta_c))) if spar_hole_dia > 0 else []
+-        hole_r = np.column_stack((c_r[0] + rear_dia/2*np.cos(theta_c), c_r[1] + rear_dia/2*np.sin(theta_c))) if rear_dia > 0 else []
+-        hole_f = np.column_stack((c_f[0] + front_dia/2*np.cos(theta_c), c_f[1] + front_dia/2*np.sin(theta_c))) if front_dia > 0 else []
+-        hole_b1 = np.column_stack((c_b1[0] + bolt1_dia/2*np.cos(theta_c), c_b1[1] + bolt1_dia/2*np.sin(theta_c))) if bolt1_dia > 0 else []
+-        hole_b2 = np.column_stack((c_b2[0] + bolt2_dia/2*np.cos(theta_c), c_b2[1] + bolt2_dia/2*np.sin(theta_c))) if bolt2_dia > 0 else []
++        hole_m = np.column_stack((c_m[0] + spar_hole_dia/2*np.cos(theta_c), c_m[1] + spar_hole_dv/2*np.sin(theta_c))) if spar_hole_dia >= 0 else []
++        hole_r = np.column_stack((c_r[0] + rear_dia/2*np.cos(theta_c), c_r[1] + rear_dia/2*np.sin(theta_c))) if rear_dia >= 0 else []
++        hole_f = np.column_stack((c_f[0] + front_dia/2*np.cos(theta_c), c_f[1] + front_dia/2*np.sin(theta_c))) if front_dia >= 0 else []
++        hole_b1 = np.column_stack((c_b1[0] + bolt1_dia/2*np.cos(theta_c), c_b1[1] + bolt1_dia/2*np.sin(theta_c))) if bolt1_dia >= 0 else []
++        hole_b2 = np.column_stack((c_b2[0] + bolt2_dia/2*np.cos(theta_c), c_b2[1] + bolt2_dia/2*np.sin(theta_c))) if bolt2_dia >= 0 else []
+         
+-        xb_r_active = [np.column_stack((xb['abs_ct'][0] + x_dia/2*np.cos(theta_c), xb['abs_ct'][1] + x_dia/2*np.sin(theta_c))) for xb in active_xbs]
+-        xb_r_skipped = [np.column_stack((xb['abs_ct'][0] + x_dia/2*np.cos(theta_c), xb['abs_ct'][1] + x_dia/2*np.sin(theta_c))) for xb in skipped_xbs]
++        xb_r_active = [np.column_stack((xb['abs_ct'][0] + x_dia/2*np.cos(theta_c), xb['abs_ct'][1] + x_dia/2*np.sin(theta_c))) for xb in active_xbs] if x_dia >= 0 else []
++        xb_r_skipped = [np.column_stack((xb['abs_ct'][0] + x_dia/2*np.cos(theta_c), xb['abs_ct'][1] + x_dia/2*np.sin(theta_c))) for xb in skipped_xbs] if x_dia >= 0 else []
+ 
+         return RibGenerationResult(
+             final_rib_mod, c_m, hole_m, c_r, hole_r, c_f, hole_f, final_truss_holes, 
+@@ -1294,7 +1294,7 @@ class RibGeneratorEngine:
+     def get_local_params(self, p: Dict[str, Any], y_local: float) -> Tuple[float, float, float, float, float, float]:
+         y_global = y_local + p['joint_length']
+         t = y_local / p['wing_span'] if p['wing_span'] > 0 else 0
+-        chord = p['chord_root'] * (1 - t) + p['chord_tip'] * t
++        chord = max(p['chord_root'] * (1 - t) + p['chord_tip'] * t, 1.0)  # Prevent extremely small/zero chords
+         spar_pct = p['spar_pos_root'] * (1 - t) + p['spar_pos_tip'] * t
+         base_aoa = p.get('base_aoa', 0.0)
+         washout_root = p.get('washout_root', 0.0)
+@@ -1333,8 +1333,10 @@ class RibGeneratorEngine:
+         active_margin = p['margin_outer_edge'] if is_root or is_tip else p['margin_outer']
+         active_beam = p['edge_beam_width'] if is_root or is_tip else p['beam_width']
+         
+-        b1 = p['root_bolt1'] if is_root else (p['tip_bolt1'] if is_tip else (0,0,0))
+-        b2 = p['root_bolt2'] if is_root else (p['tip_bolt2'] if is_tip else (0,0,0))
++        b1 = p['root_bolt1'] if is_root else (p['tip_bolt1'] if is_tip else (0,0,-1.0))
++        b2 = p['root_bolt2'] if is_root else (p['tip_bolt2'] if is_tip else (0,0,-1.0))
++        if None in b1: b1 = (0.0, 0.0, -1.0)
++        if None in b2: b2 = (0.0, 0.0, -1.0)
+ 
+         te_cut_val = te_cut_override if te_cut_override is not None else p['te_cut']
+ 
+@@ -1348,10 +1350,43 @@ class RibGeneratorEngine:
+             t2 = (y_global + thickness - p['diag2_y_main']) / (p['diag2_y_rear'] - p['diag2_y_main'])
+             diag_params.append({'t1': t1, 't2': t2, 'R': p['rear_spar_dia'] / 2.0, 't': thickness})
+ 
++        # Calculate interpolated positions for spars
++        front_dx_root = p.get('front_spar_dx_root')
++        if front_dx_root is None: front_dx_root = p.get('front_spar_dx')
++        front_dx_tip = p.get('front_spar_dx_tip')
++        if front_dx_tip is None: front_dx_tip = p.get('front_spar_dx')
++        front_dy_root = p.get('front_spar_dy_root')
++        if front_dy_root is None: front_dy_root = p.get('front_spar_dy')
++        front_dy_tip = p.get('front_spar_dy_tip')
++        if front_dy_tip is None: front_dy_tip = p.get('front_spar_dy')
++        
++        if None in (front_dx_root, front_dx_tip, front_dy_root, front_dy_tip):
++            p['front_spar_dia'] = -1.0
++            front_dx_root = front_dx_tip = front_dy_root = front_dy_tip = 0.0
++
++        front_dx = front_dx_root * (1 - blend) + front_dx_tip * blend
++        front_dy = front_dy_root * (1 - blend) + front_dy_tip * blend
++
++        rear_dx_root = p.get('rear_spar_dx_root')
++        if rear_dx_root is None: rear_dx_root = p.get('rear_spar_dx')
++        rear_dx_tip = p.get('rear_spar_dx_tip')
++        if rear_dx_tip is None: rear_dx_tip = p.get('rear_spar_dx')
++        rear_dy_root = p.get('rear_spar_dy_root')
++        if rear_dy_root is None: rear_dy_root = p.get('rear_spar_dy')
++        rear_dy_tip = p.get('rear_spar_dy_tip')
++        if rear_dy_tip is None: rear_dy_tip = p.get('rear_spar_dy')
++
++        if None in (rear_dx_root, rear_dx_tip, rear_dy_root, rear_dy_tip):
++            p['rear_spar_dia'] = -1.0
++            rear_dx_root = rear_dx_tip = rear_dy_root = rear_dy_tip = 0.0
++
++        rear_dx = rear_dx_root * (1 - blend) + rear_dx_tip * blend
++        rear_dy = rear_dy_root * (1 - blend) + rear_dy_tip * blend
++
+         params_obj = RibParameters(
+             file1=p['file1'], file2=p['file2'], blend_ratio=blend, chord=chord, spar_pct=spar_pct, washout_deg=washout,
+-            spar_hole_dia=p['spar_hole_dia'], spar_hole_dv=p.get('spar_hole_dv', 0.0) or p['spar_hole_dia'], rear_dx=p['rear_spar_dx'], rear_dy=p['rear_spar_dy'], rear_dia=p['rear_spar_dia'],
+-            front_dx=p['front_spar_dx'], front_dy=p['front_spar_dy'], front_dia=p['front_spar_dia'],
++            spar_hole_dia=p['spar_hole_dia'], spar_hole_dv=p.get('spar_hole_dv', 0.0) or p['spar_hole_dia'], rear_dx=rear_dx, rear_dy=rear_dy, rear_dia=p['rear_spar_dia'],
++            front_dx=front_dx, front_dy=front_dy, front_dia=p['front_spar_dia'],
+             truss_angle=angle, truss_front_n=p['truss_front_n'], truss_rear_n=p['truss_rear_n'],
+             beam_width=active_beam, margin_spar=p['margin_spar'], margin_bolt=p['margin_bolt'], margin_outer=active_margin,
+             truss_fillet=p['truss_fillet'], min_hole_dia=p['min_hole_dia'], xb_t_list=xb_t_list, x_dia=x_dia,
+@@ -1420,11 +1455,11 @@ class RibGeneratorEngine:
+             if len(rib_pts) > 0: msp.add_lwpolyline(shift_poly(rib_pts), close=True, dxfattribs={'layer': 'RIB_OUTLINE'})
+         
+         if layer_flags.get('dxf_layer_holes', True):
+-            if d_m > 0: msp.add_circle(center=shift(c_m), radius=d_m/2.0, dxfattribs={'layer': 'HOLES'})
+-            if d_f > 0: msp.add_circle(center=shift(c_f), radius=d_f/2.0, dxfattribs={'layer': 'HOLES'})
+-            if d_r > 0: msp.add_circle(center=shift(c_r), radius=d_r/2.0, dxfattribs={'layer': 'HOLES'})
+-            if d_b1 > 0: msp.add_circle(center=shift(c_b1), radius=d_b1/2.0, dxfattribs={'layer': 'HOLES'})
+-            if d_b2 > 0: msp.add_circle(center=shift(c_b2), radius=d_b2/2.0, dxfattribs={'layer': 'HOLES'})
++            if d_m >= 0: msp.add_circle(center=shift(c_m), radius=d_m/2.0, dxfattribs={'layer': 'HOLES'})
++            if d_f >= 0: msp.add_circle(center=shift(c_f), radius=d_f/2.0, dxfattribs={'layer': 'HOLES'})
++            if d_r >= 0: msp.add_circle(center=shift(c_r), radius=d_r/2.0, dxfattribs={'layer': 'HOLES'})
++            if d_b1 >= 0: msp.add_circle(center=shift(c_b1), radius=d_b1/2.0, dxfattribs={'layer': 'HOLES'})
++            if d_b2 >= 0: msp.add_circle(center=shift(c_b2), radius=d_b2/2.0, dxfattribs={'layer': 'HOLES'})
+             for diag_poly_pts in diag_poly_pts_list:
+                 if len(diag_poly_pts) > 0: msp.add_lwpolyline(shift_poly(diag_poly_pts), close=True, dxfattribs={'layer': 'HOLES'})
+ 
+@@ -1489,10 +1524,19 @@ class RibGeneratorEngine:
+         d_r = p.get('rear_spar_dia', 0.0)
+         d_f = p.get('front_spar_dia', 0.0)
+         
+-        front_dx = p.get('front_spar_dx', 0.0)
+-        front_dy = p.get('front_spar_dy', 0.0)
+-        rear_dx = p.get('rear_spar_dx', 0.0)
+-        rear_dy = p.get('rear_spar_dy', 0.0)
++        front_dx_root = p.get('front_spar_dx_root', p.get('front_spar_dx', 0.0))
++        front_dx_tip = p.get('front_spar_dx_tip', p.get('front_spar_dx', 0.0))
++        front_dy_root = p.get('front_spar_dy_root', p.get('front_spar_dy', 0.0))
++        front_dy_tip = p.get('front_spar_dy_tip', p.get('front_spar_dy', 0.0))
++        front_dx = front_dx_root * (1 - t) + front_dx_tip * t
++        front_dy = front_dy_root * (1 - t) + front_dy_tip * t
++
++        rear_dx_root = p.get('rear_spar_dx_root', p.get('rear_spar_dx', 0.0))
++        rear_dx_tip = p.get('rear_spar_dx_tip', p.get('rear_spar_dx', 0.0))
++        rear_dy_root = p.get('rear_spar_dy_root', p.get('rear_spar_dy', 0.0))
++        rear_dy_tip = p.get('rear_spar_dy_tip', p.get('rear_spar_dy', 0.0))
++        rear_dx = rear_dx_root * (1 - t) + rear_dx_tip * t
++        rear_dy = rear_dy_root * (1 - t) + rear_dy_tip * t
+         
+         try:
+             pts1 = self.load_dat(p.get('file1', ''))
+@@ -1590,7 +1634,7 @@ class RibGeneratorEngine:
+         slot2_x = slot_center_x + slot_interval / 2.0
+         
+         # Define base limits
+-        front_pillar_left = (c_f[0] - d_f/2.0) - jig_wall_thickness if d_f > 0 else (c_m[0] - d_m/2.0) - jig_wall_thickness
++        front_pillar_left = (c_f[0] - d_f/2.0) - jig_wall_thickness if d_f >= 0 else (c_m[0] - d_m/2.0) - jig_wall_thickness
+         slot1_left = slot1_x - slot_width / 2.0
+         base_start_x = min(front_pillar_left, slot1_left - jig_wall_thickness)
+ 
+@@ -1652,9 +1696,9 @@ class RibGeneratorEngine:
+         
+         # Create Solid Pillars
+         pillars = []
+-        if d_f > 0: pillars.append(create_pillar(c_f, d_f))
+-        if d_m > 0: pillars.append(create_pillar(c_m, d_m, dv_m))
+-        if d_r > 0: pillars.append(create_pillar(c_r, d_r))
++        if d_f >= 0: pillars.append(create_pillar(c_f, d_f))
++        if d_m >= 0: pillars.append(create_pillar(c_m, d_m, dv_m))
++        if d_r >= 0: pillars.append(create_pillar(c_r, d_r))
+         
+         frame = unary_union(pillars) if pillars else Polygon()
+         
+@@ -1715,16 +1759,16 @@ class RibGeneratorEngine:
+         frame = frame.union(base_poly)
+             
+         # Cut spar holes (Rectangular boxes, width d, bottom at c_y - d/2)
+-        if d_f > 0:
++        if d_f >= 0:
+             f_cut = box(c_f[0] - d_f/2.0, c_f[1] - d_f/2.0, c_f[0] + d_f/2.0, c_f[1] + d_f)
+             frame = frame.difference(f_cut)
+             
+-        if d_m > 0:
+-            dv = dv_m if dv_m > 0 else d_m
++        if d_m >= 0:
++            dv = dv_m if dv_m >= 0 else d_m
+             m_cut = box(c_m[0] - d_m/2.0, c_m[1] - dv/2.0, c_m[0] + d_m/2.0, c_m[1] + dv)
+             frame = frame.difference(m_cut)
+             
+-        if d_r > 0:
++        if d_r >= 0:
+             r_cut = box(c_r[0] - d_r/2.0, c_r[1] - d_r/2.0, c_r[0] + d_r/2.0, c_r[1] + d_r)
+             frame = frame.difference(r_cut)
+             
