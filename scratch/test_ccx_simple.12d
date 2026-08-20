@@ -1,0 +1,10 @@
+ ELEMENT            1 with label "CPS3    " and with nodes:
+          1          2          3
+  is expanded into a "C3D6  S " element with topology:
+          5          8         11          7         10         13
+
+ ELEMENT            2 with label "CPS3    " and with nodes:
+          1          3          4
+  is expanded into a "C3D6  S " element with topology:
+          5         11         14          7         13         16
+

@@ -89,14 +89,20 @@ class WeightCalculator:
                 vol_mm3 = abs(float(mesh.volume)) if hasattr(mesh, 'volume') else 0.0
                 area_mm2 = float(mesh.area) if hasattr(mesh, 'area') else 0.0
 
-                # バウンディングボックスのY軸スパン（スパー類の長さ推定用）
+                # バウンディングボックスのY軸スパンと対角線（斜め配置の正確な長さ推定用）
                 bounds = mesh.bounds  # shape (2, 3)
-                span_mm = float(bounds[1][1] - bounds[0][1]) if bounds is not None else 0.0
+                if bounds is not None:
+                    span_mm = float(bounds[1][1] - bounds[0][1])
+                    diag_mm = float(np.linalg.norm(bounds[1] - bounds[0]))
+                else:
+                    span_mm = 0.0
+                    diag_mm = 0.0
 
                 props[name] = {
                     'volume_cm3':   vol_mm3 / 1000.0,  # mm³ → cm³
                     'area_m2':      area_mm2 / 1.0e6,   # mm² → m²
                     'bbox_span_m':  span_mm / 1000.0,   # mm → m
+                    'bbox_diag_m':  diag_mm / 1000.0,   # mm → m
                 }
             except Exception as e:
                 props[name] = {'volume_cm3': 0.0, 'area_m2': 0.0, 'bbox_span_m': 0.0, 'error': str(e)}
@@ -146,6 +152,7 @@ class WeightCalculator:
             category_data[cat]['volume_cm3'] += mp['volume_cm3']
             category_data[cat]['area_m2'] += mp['area_m2']
             category_data[cat]['bbox_span_m'] += mp['bbox_span_m']
+            category_data[cat]['bbox_diag_m'] = category_data[cat].get('bbox_diag_m', 0.0) + mp.get('bbox_diag_m', 0.0)
 
         rho_foam = mat_props.get('foam_volume_density', 0.030)
         sigma_skin = mat_props.get('foam_skin_area_density', 50.0)
@@ -206,7 +213,8 @@ class WeightCalculator:
         # Rear Spar: 解析的計算 (Length × CrossArea × Density)
         if 'rear_spar' in category_data:
             d = category_data['rear_spar']
-            span_m = d['bbox_span_m']
+            # リアスパーが後退角などを持つ場合は、3次元的な対角長(diag_m)を使用
+            span_m = d.get('bbox_diag_m', d['bbox_span_m'])
             od = wing_params.get('rear_spar_dia', 0.0)
             t = wing_params.get('rear_spar_thickness', 0.0) # Assumed thickness param if exists
             if t <= 0: t = 1.0 # Default 1mm thickness
@@ -214,7 +222,7 @@ class WeightCalculator:
             area_cm2 = (np.pi/4) * (od**2 - id_**2) / 100.0
             w = (span_m * 100.0) * area_cm2 * rho_ct
             results.append(_row('Rear_Spar', 'rear_spar', '後桁 (Rear Spar)',
-                                f"L={span_m*1000:.1f}mm, OD={od}mm, t={t}mm",
+                                f"L(3D)={span_m*1000:.1f}mm, OD={od}mm, t={t}mm",
                                 w, '解析的計算(円筒) × ρ'))
 
         # Connectors: 体積×体積密度
@@ -239,24 +247,24 @@ class WeightCalculator:
         # Stringers: 解析的計算
         if 'stringer' in category_data:
             d = category_data['stringer']
-            span_m = d['bbox_span_m']
+            span_m = d.get('bbox_diag_m', d['bbox_span_m'])
             s_data = wing_params.get('stringers_data', [])
             total_area_mm2 = sum(s.get('width', 0) * s.get('depth', 0) for s in s_data)
             area_cm2 = total_area_mm2 / 100.0
             w = (span_m * 100.0) * area_cm2 * rho_str
             results.append(_row('Stringers', 'stringer', 'ストリンガー',
-                                f"L≈{span_m*1000:.1f}mm, Area={total_area_mm2:.1f}mm²",
-                                w, '解析的計算(断面×長) × ρ'))
+                                f"L(3D)≈{span_m*1000:.1f}mm, Area={total_area_mm2:.1f}mm²",
+                                w, '解析的計算(断面×対角長) × ρ'))
 
-        # X-Brace Wires: バウンディングスパン合計×線密度
+        # X-Brace Wires: バウンディングの対角線合計×線密度
         if 'xbrace' in category_data:
             d = category_data['xbrace']
-            # swept mesh の長さはbbox_span_mで近似
-            total_len_m = d['bbox_span_m']
+            # Xブレースは斜め配線のため、バウンディングボックスの対角線を真の長さとして採用
+            total_len_m = d.get('bbox_diag_m', d['bbox_span_m'])
             w = total_len_m * lam_xb
             results.append(_row('XBraceWires', 'xbrace', 'X-ブレースワイヤー',
-                                f"L≈{total_len_m*1000:.1f}mm",
-                                w, 'L × 線密度'))
+                                f"L(3D)≈{total_len_m*1000:.1f}mm",
+                                w, 'L(対角線) × 線密度'))
 
         # Carbon Ribs: 面積（片面）×（カーボン面密度 + 接着剤面密度）
         if 'carbon_ribs' in category_data:

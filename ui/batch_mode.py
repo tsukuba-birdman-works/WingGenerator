@@ -4,6 +4,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from core.fea_engine import RibFEAEngine
+from ui.fea_window import FEAWindow
 from core.engine import RibGeneratorEngine, RibParameters, RibGenerationResult
 from utils.config import ConfigHelper
 from core.export_3d import Wing3DExporter, Wing3DBuilder
@@ -17,6 +19,7 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
 
     def __init__(self, root):
         super().__init__(root)
+        self.root.title("WingGenerator - Ver.1.0.0 (Batch Wing Mode)")
         from core.engine import RibGeneratorEngine
         self.engine = RibGeneratorEngine()
         from ui.param_spec import BATCH_PARAMS
@@ -243,6 +246,7 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
         self.combo_rib.bind("<<ComboboxSelected>>", self.on_rib_select_fast)
         
         ttk.Button(control_frame, text="Generate ALL", command=lambda: self.update_preview_full()).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Run FEA", command=self.open_fea_window).pack(side=tk.LEFT, padx=5)
         
         angle_frame = ttk.Frame(lf_preview)
         angle_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -641,6 +645,8 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
                 self.draw_plot(dummy_pts, c_m, h_m, c_r, h_r, c_f, h_f, [], [], [], [], [], [], dummy_pts, dummy_pts, dummy_pts, dummy_pts, dummy_pts, dummy_pts, [], None, title, jig_pts=jig_pts, jig_wing_pts=wing_pts)
             else:
                 res = self.engine.generate_rib_at_y(p, y_local, idx, t_rib, is_carbon=is_carbon, te_cut_override=te_cut_val)
+                self._cached_single_result = res
+                self._cached_single_params = p
                 self.last_warnings = res.warnings_list
                 chord, spar_pct, washout, blend, local_xb_pct, x_dia = self.get_local_params(y_local)
                 angle = p['truss_angles_dict'].get(idx, p['base_truss_angle'])
@@ -691,6 +697,19 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
         self.ax.set_title(title); self.ax.set_xlabel("X (mm)"); self.ax.set_ylabel("Y (mm)")
         handles, labels = self.ax.get_legend_handles_labels(); by_label = dict(zip(labels, handles)); self.ax.legend(by_label.values(), by_label.keys())
         self.canvas.draw()
+        
+    def open_fea_window(self):
+        if getattr(self, 'is_updating_ui', False): return
+        if not hasattr(self, '_cached_single_result') or self._cached_single_result is None:
+            messagebox.showerror("Error", "Please select a rib from the dropdown and ensure it previews correctly.")
+            return
+            
+        try:
+            FEAWindow(self.root, self._cached_single_result, self._cached_single_params, work_dir=os.path.abspath("."))
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open FEA: {e}")
+            import traceback
+            traceback.print_exc()
 
     def export_dxf(self):
         f1, f2 = self.file1_path.get(), self.file2_path.get()

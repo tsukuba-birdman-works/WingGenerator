@@ -14,7 +14,7 @@ from utils.config import ConfigHelper
 class WingtipFinGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Wingtip Fin Generator (翼端フィン設計)")
+        self.root.title("WingGenerator - Ver.1.0.0 (Wingtip Fin Generator)")
         self.root.geometry("1100x780")
         
         self.engine = WingtipFinEngine()
@@ -223,6 +223,11 @@ class WingtipFinGUI:
         tk.Button(f_export, text="Export OBJ", command=lambda: self.export_model("obj"), bg="#ff9500", fg="white", font=("Arial", 9, "bold")).pack(fill=tk.X, pady=2)
         tk.Button(f_export, text="Export GLB (glTF)", command=lambda: self.export_model("glb"), bg="#af52de", fg="white", font=("Arial", 9, "bold")).pack(fill=tk.X, pady=2)
         
+        # flow5 / Aerodynamic Export
+        f_aero = tk.LabelFrame(self.scroll_content, text="Aerodynamic Export", bg="#f5f5f7", padx=10, pady=5)
+        f_aero.pack(fill=tk.X, pady=5)
+        tk.Button(f_aero, text="Export to flow5 (TXT)", command=self.export_flow5, bg="#000000", fg="white", font=("Arial", 9, "bold")).pack(fill=tk.X, pady=2)
+
         # Home button
         tk.Button(self.scroll_content, text="← Return to Launcher", command=self.return_to_launcher, bg="gray", fg="white", font=("Arial", 9)).pack(fill=tk.X, pady=5)
 
@@ -386,6 +391,41 @@ class WingtipFinGUI:
             messagebox.showinfo("Export Successful", f"Saved 3D Model to:\n{filepath}")
         except Exception as e:
             messagebox.showerror("Export Error", f"Could not export 3D model:\n{str(e)}")
+
+    def export_flow5(self):
+        try:
+            params = self.get_ui_params()
+            mesh = self.engine.generate_fin_mesh(params)
+            sections = mesh.metadata.get('flow5_sections', [])
+            
+            if not sections:
+                messagebox.showerror("Export Error", "No section data found. Please update preview first.")
+                return
+
+            filepath = filedialog.asksaveasfilename(
+                title="Save flow5 Wing Text File",
+                defaultextension=".txt",
+                filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+                initialfile="Wingtip_Fin.txt"
+            )
+            if not filepath:
+                return
+                
+            with open(filepath, 'w') as f:
+                f.write("Wingtip_Fin\n")
+                f.write("// Y_span      Chord      Offset_X   Dihedral   Twist      Foil_Name\n")
+                for s in sections:
+                    y_span = s['y_span'] / 1000.0   # Convert to m
+                    chord = s['chord'] / 1000.0     # Convert to m
+                    offset = s['offset_x'] / 1000.0 # Convert to m
+                    dihedral = s['dihedral']
+                    twist = s['twist']
+                    foil = s['airfoil']
+                    f.write(f"   {y_span:.4f}      {chord:.4f}      {offset:.4f}      {dihedral:.2f}      {twist:.2f}      {foil}\n")
+                    
+            messagebox.showinfo("Export Successful", f"flow5 import text saved to {filepath}")
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Failed to export flow5 data:\n{str(e)}")
 
     def load_config(self):
         ConfigHelper.load_config(self)

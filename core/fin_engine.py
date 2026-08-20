@@ -120,6 +120,7 @@ class WingtipFinEngine:
         tip_points_up = []
         tip_points_low = []
         spar_line = []
+        flow5_sections = []
 
         for i in range(y_slices + 1):
             t = i / y_slices
@@ -187,6 +188,23 @@ class WingtipFinEngine:
                 Z_spar = y_real * np.sin(cant_rad)
                 
             spar_line.append([X_spar - X_spar_root, Y_spar * S_side, Z_spar])
+            
+            # Record for flow5 export
+            dihedral_deg = 0.0
+            if style == "Winglet":
+                dihedral_deg = np.degrees(phi)
+            elif "Horner" not in style and style != "Round Dome":
+                dihedral_deg = cant_angle
+                
+            twist_val = t * twist_deg
+            flow5_sections.append({
+                'y_span': y_real,
+                'chord': C_t,
+                'offset_x': X_LE,
+                'dihedral': dihedral_deg,
+                'twist': twist_val,
+                'airfoil': params.get('airfoil_path', '').split('/')[-1].replace('.dat', '') or 'Airfoil'
+            })
             
             if "Horner" in style:
                 thickness = (airfoil_z_up - airfoil_z_low) * C_t
@@ -371,8 +389,9 @@ class WingtipFinEngine:
         except:
             pass
             
-        # Attach 3D spar line metadata
+        # Attach 3D spar line metadata and flow5 data
         mesh.metadata['spar_line'] = np.array(spar_line)
+        mesh.metadata['flow5_sections'] = flow5_sections
         return mesh
 
     def generate_main_wing_mesh(self, params):

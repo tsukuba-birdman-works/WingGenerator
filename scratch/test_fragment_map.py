@@ -1,0 +1,10 @@
+import gmsh
+gmsh.initialize()
+gmsh.option.setNumber("General.Terminal", 1)
+gmsh.model.add("test")
+p1 = gmsh.model.occ.addRectangle(0,0,0, 10,10)
+p2 = gmsh.model.occ.addRectangle(10,0,0, 10,10)
+out, out_map = gmsh.model.occ.fragment([(2,p1)], [(2,p2)])
+print("out:", out)
+print("out_map:", out_map)
+gmsh.finalize()

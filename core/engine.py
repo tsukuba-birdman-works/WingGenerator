@@ -1291,14 +1291,40 @@ class RibGeneratorEngine:
                 warnings_list.append("Rib shape is invalid!")
 
         theta_c = np.linspace(0, 2 * np.pi, 100)
-        hole_m = np.column_stack((c_m[0] + spar_hole_dia/2*np.cos(theta_c), c_m[1] + spar_hole_dv/2*np.sin(theta_c))) if spar_hole_dia >= 0 else []
-        hole_r = np.column_stack((c_r[0] + rear_dia/2*np.cos(theta_c), c_r[1] + rear_dia/2*np.sin(theta_c))) if rear_dia >= 0 else []
-        hole_f = np.column_stack((c_f[0] + front_dia/2*np.cos(theta_c), c_f[1] + front_dia/2*np.sin(theta_c))) if front_dia >= 0 else []
-        hole_b1 = np.column_stack((c_b1[0] + bolt1_dia/2*np.cos(theta_c), c_b1[1] + bolt1_dia/2*np.sin(theta_c))) if bolt1_dia >= 0 else []
-        hole_b2 = np.column_stack((c_b2[0] + bolt2_dia/2*np.cos(theta_c), c_b2[1] + bolt2_dia/2*np.sin(theta_c))) if bolt2_dia >= 0 else []
+        hole_m = np.column_stack((c_m[0] + spar_hole_dia/2*np.cos(theta_c), c_m[1] + spar_hole_dv/2*np.sin(theta_c))) if spar_hole_dia > 0 and len(c_m) >= 2 else []
+        hole_r = np.column_stack((c_r[0] + rear_dia/2*np.cos(theta_c), c_r[1] + rear_dia/2*np.sin(theta_c))) if rear_dia > 0 and len(c_r) >= 2 else []
+        hole_f = np.column_stack((c_f[0] + front_dia/2*np.cos(theta_c), c_f[1] + front_dia/2*np.sin(theta_c))) if front_dia > 0 and len(c_f) >= 2 else []
+        hole_b1 = np.column_stack((c_b1[0] + bolt1_dia/2*np.cos(theta_c), c_b1[1] + bolt1_dia/2*np.sin(theta_c))) if bolt1_dia > 0 and len(c_b1) >= 2 else []
+        hole_b2 = np.column_stack((c_b2[0] + bolt2_dia/2*np.cos(theta_c), c_b2[1] + bolt2_dia/2*np.sin(theta_c))) if bolt2_dia > 0 and len(c_b2) >= 2 else []
         
-        xb_r_active = [np.column_stack((xb['abs_ct'][0] + x_dia/2*np.cos(theta_c), xb['abs_ct'][1] + x_dia/2*np.sin(theta_c))) for xb in active_xbs] if x_dia >= 0 else []
-        xb_r_skipped = [np.column_stack((xb['abs_ct'][0] + x_dia/2*np.cos(theta_c), xb['abs_ct'][1] + x_dia/2*np.sin(theta_c))) for xb in skipped_xbs] if x_dia >= 0 else []
+        xb_r_active = [np.column_stack((xb['abs_ct'][0] + x_dia/2*np.cos(theta_c), xb['abs_ct'][1] + x_dia/2*np.sin(theta_c))) for xb in active_xbs if len(xb['abs_ct']) >= 2] if x_dia > 0 else []
+        xb_r_skipped = [np.column_stack((xb['abs_ct'][0] + x_dia/2*np.cos(theta_c), xb['abs_ct'][1] + x_dia/2*np.sin(theta_c))) for xb in skipped_xbs if len(xb['abs_ct']) >= 2] if x_dia > 0 else []
+
+        # --- Hole Boundary Collision Check ---
+        if SHAPELY_AVAILABLE and final_rib_mod_poly:
+            try:
+                poly_mod = Polygon(final_rib_mod).buffer(0)
+                
+                def check_hole(pts, name):
+                    if len(pts) > 0:
+                        try:
+                            h_poly = Polygon(pts)
+                            # 完全に中(within)でもなく、完全に外(disjoint)でもない場合(境界と交差・一部はみ出し)
+                            if not h_poly.within(poly_mod) and not h_poly.disjoint(poly_mod):
+                                warnings_list.append(f"WARNING: {name} intersects rib boundary!")
+                        except:
+                            pass
+                            
+                check_hole(hole_m, "Main Spar")
+                check_hole(hole_r, "Rear Spar")
+                check_hole(hole_f, "Front Spar")
+                check_hole(hole_b1, "Bolt 1")
+                check_hole(hole_b2, "Bolt 2")
+                
+                for i, xb_pts in enumerate(xb_r_active):
+                    check_hole(xb_pts, f"X-Brace({i+1})")
+            except Exception:
+                pass
 
         return RibGenerationResult(
             final_rib_mod, c_m, hole_m, c_r, hole_r, c_f, hole_f, final_truss_holes, 

@@ -16,7 +16,7 @@ class FoamCutterGUI:
                  target_type="Plank", target_thickness=0.0, cut_kerf=1.5, wire_dist=1000.0,
                  offset_x=0.0, offset_y=0.0, entry_x=0.0, entry_y=0.0, feedrate=100.0):
         self.root = root
-        self.root.title("4-Axis Foam Cutter CAM")
+        self.root.title("WingGenerator - Ver.1.0.0 (4-Axis Foam Cutter CAM)")
         self.root.geometry("950x780")
         
         self.engine = FoamCutterEngine()

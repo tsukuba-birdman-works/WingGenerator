@@ -1,0 +1,77 @@
+\documentclass[11pt,a4paper]{ltjsarticle}
+\usepackage{luatexja}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\title{WingGenerator ユーザーマニュアル}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{はじめに}
+本ソフトウェア「WingGenerator」は、人力飛行機やUAV向けの翼二次構造（リブ・トラスなど）および加工・治具用データを生成するツール群です。
+
+\section{機能概要}
+本ツールには以下の主要な機能が含まれています。
+\begin{itemize}
+    \item \textbf{Batch Wing Mode (翼全体のリブ設計):} 翼長、リブ間隔、翼根・翼端の翼型パラメータに基づいて、翼全体のリブ形状とトラス構造を一括で生成・出力します。
+    \item \textbf{4-Axis Foam CAM (フォームコア加工):} 熱線カッター（CNC）を用いてフォームコア材を加工するためのGコードを生成します。
+    \item \textbf{Wingtip Fin Gen (翼端フィン設計):} 翼端ウイングレットやフィンの形状を設計・出力します。
+    \item \textbf{FEA Analysis (有限要素解析):} 生成したリブ形状に対して、CalculiXを用いた強度解析（応力・変形・接着部反力のシミュレーション）を行います。
+    \item \textbf{Weight Calculator (重量計算):} 各部材の材質・密度から、リブ全体の重量を算出します。
+\end{itemize}
+
+\section{使用方法}
+\subsection{起動}
+コマンドプロンプトやターミナルで以下のコマンドを実行し、ランチャーを起動します。
+\begin{lstlisting}[language=bash, frame=single]
+python main.py
+\end{lstlisting}
+
+\subsection{Batch Wing Mode の使い方}
+\begin{enumerate}
+    \item \textbf{レイアウト設定:} 「翼全体」タブで翼長（Span）、リブ間隔（Rib Interval）を入力します。翼根（Root）と翼端（Tip）の翼型データ（DAT形式など）、翼弦長（Chord）、主桁位置、ねじり下げ（Washout）を設定します。
+    \item \textbf{リブ設定:} 「リブ」タブで、主桁・後桁用の穴径、肉抜き穴（トラス）の数とマージン、トラス個別縮小率などを設定します。
+    \item \textbf{プレビュー:} 画面右側のプレビューウィンドウおよびスライダーを用いて、各リブの形状変化をリアルタイムで確認します。
+    \item \textbf{エクスポート:} 設定完了後、「Export GLB \& DXF」ボタンをクリックすると、チェックボックスで指定した項目の3Dモデル（GLB）および2D図面（DXF）が出力されます。
+\end{enumerate}
+
+\subsection{FEA解析の使い方}
+構造の強度確認を行うための機能です。実行には CalculiX (ccxコマンド) がインストールされ、PATHが通っている必要があります。
+\begin{enumerate}
+    \item Batch Mode等のプレビュー画面から「FEA Analysis」ボタンをクリックします。
+    \item スパン方向の揚力分布が記述されたCSVファイル（\texttt{Y(span), Lift(N)} の2カラム形式）を選択します。
+    \item リブの材質（ヤング率、ポアソン比）、プランク（前縁スキン）の有無や材質、許容応力（Allowable Stress）などを入力します。
+    \item 「Run Analysis」を実行すると、メッシュ生成と解析が行われ、キャンバスに応力分布（Von Mises応力）と変形量が表示されます。
+    \item スパー（桁）接着部には、局所的な接着反力が矢印（Show RF ArrowsがONの場合）、またはカラードット（OFFの場合）で表示され、テキストボックスには接着面積から求めた平均せん断応力が出力されます。許容応力を超えた場合は赤い×マークが点滅します。
+\end{enumerate}
+
+\subsection{4-Axis Foam CAM の使い方}
+ランチャーから起動し、熱線カッター（Hot Wire CNC）を制御するためのGコードを生成します。
+\begin{enumerate}
+    \item ルート側とチップ側の翼型ファイルを読み込みます。
+    \item 翼弦長（Chord）、機械の有効長、熱線による溶け幅（Kerf）などを入力します。
+    \item アプローチ（進入経路）やタブ（切り落とさずに残す部分）の設定を行います。
+    \item 「Generate G-code」で加工データが出力されます。
+\end{enumerate}
+
+\subsection{Wingtip Fin Gen の使い方}
+翼端に取り付けるフィン（ウイングレット等）の平面形や翼型推移を設定・設計し、DXFやGLBデータとして出力します。
+
+\subsection{Weight Calculator (重量計算)}
+設計したリブの体積から、予想される重量を算出します。
+\begin{enumerate}
+    \item Batch Mode等で設計後、「Weight Calc」ボタンをクリックします。
+    \item 各部品（リブ本体、プランク材、カーボン補強等）の密度（Density）や厚みを入力します。
+    \item 即座に全体の推定重量が更新され、機体全体の重量見積もりに活用できます。
+\end{enumerate}
+
+\end{document}
