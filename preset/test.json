@@ -6,112 +6,103 @@
             "export_dir": ""
         }
     },
-    "Wing": {
-        "Layout": {
+    "翼全体": {
+        "レイアウト": {
             "wing_name": "26_No1",
             "wing_span": "3400.0",
             "joint_length": "300",
             "rib_interval": "262.0",
             "wing_type": "Right",
-            "base_aoa": "0.0",
-            "export_is_left": false
+            "base_aoa": "0.0"
         },
-        "Airfoil (Root)": {
+        "翼根": {
             "file1_path": "/home/akihito-kasai/Desktop/tbw/Ribgenerator/airfoils/26_center_XGAG_1.23 _11.61_48.5.dat",
             "chord_root": "1050",
             "spar_pos_root": "41.5",
             "washout_root": "0.0"
         },
-        "LE Interpolation": {
-            "le_interp_active": false,
-            "le_interp_range": "10.0",
-            "le_interp_divisions": 50
-        },
-        "Airfoil (Tip)": {
+        "翼端": {
             "file2_path": "/home/akihito-kasai/Desktop/tbw/Ribgenerator/airfoils/26_1st-tip_XGAG_1.183 _11.3.dat",
             "chord_tip": "1030",
             "spar_pos_tip": "40.5",
             "washout_tip": "0.0"
+        },
+        "前縁補完": {
+            "le_interp_active": false,
+            "le_interp_range": "10.0",
+            "le_interp_divisions": 50
         }
     },
-    "Spar": {
-        "Front Spar": {
+    "桁": {
+        "主桁": {
+            "spar_hole_dia": "107",
+            "spar_hole_dv": "0.0",
+            "main_spar_inner_dia": "106"
+        },
+        "フロントスパ": {
             "front_spar_dia": "10.0",
             "front_spar_inner_dia": "8.0",
             "front_spar_dx": "-330",
             "front_spar_dy": "-28"
         },
-        "Main Spar": {
-            "spar_hole_dia": "107",
-            "spar_hole_dv": "0.0",
-            "main_spar_inner_dia": "106"
-        },
-        "Rear Spar (Root)": {
+        "リアスパ": {
             "rear_spar_dia": "13.4",
             "rear_spar_inner_dia": "10",
             "rear_spar_dx_root": "400",
-            "rear_spar_dy_root": "-28"
-        },
-        "Rear Spar (Tip)": {
+            "rear_spar_dy_root": "-28",
             "rear_spar_dx_tip": "400",
-            "rear_spar_dy_tip": "-28"
+            "rear_spar_dy_tip": "-28",
+            "rear_spar_cutoff_act": true,
+            "rear_spar_cutoff_start": "3000",
+            "rear_spar_main_conn": "3700"
         },
-        "Root Bolt 1": {
+        "ボルト穴": {
             "root_bolt1_dia": "0.0",
             "root_bolt1_dx": "0.0",
-            "root_bolt1_dy": "0.0"
-        },
-        "Root Bolt 2": {
+            "root_bolt1_dy": "0.0",
             "root_bolt2_dia": "0.0",
             "root_bolt2_dx": "0.0",
-            "root_bolt2_dy": "0.0"
-        },
-        "Tip Bolt 1": {
+            "root_bolt2_dy": "0.0",
             "tip_bolt1_dia": "0.0",
             "tip_bolt1_dx": "0.0",
-            "tip_bolt1_dy": "0.0"
-        },
-        "Tip Bolt 2": {
+            "tip_bolt1_dy": "0.0",
             "tip_bolt2_dia": "0.0",
             "tip_bolt2_dx": "0.0",
-            "tip_bolt2_dy": "0.0"
-        },
-        "Bolt Spacers & Margins": {
+            "tip_bolt2_dy": "0.0",
             "bolt_spacer_inner_dia": "4.0",
-            "bolt_spacer_length": "10.0",
-            "margin_bolt": "10"
+            "bolt_spacer_length": "10.0"
         }
     },
-    "PlankTE": {
-        "Plank Skin": {
+    "プランク・後縁": {
+        "プランク": {
             "plank_end": "65",
             "plank_part_end": "65.0",
             "plank_part_start": "-10",
             "plank_start": "-10",
             "plank_thick": "2.9"
         },
-        "TE Cut & Thick": {
+        "後縁": {
             "te_cap_thick": "0.1",
             "te_cut": "40.0"
         },
-        "Upper Front Cap": {
+        "後縁バルサ": {
+            "te_balsa_act": true,
+            "te_balsa_end": "75",
+            "te_balsa_start": "-79",
+            "te_balsa_thick": "1.0"
+        },
+        "後縁キャップ": {
             "te_cap_uf_act": true,
-            "te_cap_uf_w": "10"
-        },
-        "Lower Front Cap": {
+            "te_cap_uf_w": "10",
             "te_cap_lf_act": true,
-            "te_cap_lf_w": "10"
-        },
-        "Upper Rear Cap": {
+            "te_cap_lf_w": "10",
             "te_cap_ur_act": true,
-            "te_cap_ur_w": "15"
-        },
-        "Lower Rear Cap": {
+            "te_cap_ur_w": "15",
             "te_cap_lr_act": true,
             "te_cap_lr_w": "15"
         }
     },
-    "Rib": {
+    "リブ": {
         "Truss & Margins": {
             "base_truss_angle": "60.0",
             "beam_width": "10",
@@ -119,45 +110,48 @@
             "margin_outer": "10",
             "margin_outer_edge": "20",
             "margin_spar": "10",
+            "margin_bolt": "10",
             "min_hole_dia": "3.0",
-            "truss_fillet": "5.0",
             "truss_front_n": "2",
             "truss_rear_n": "3",
+            "truss_scale_front": "",
+            "truss_scale_rear": "",
+            "truss_fillet": "5.0",
             "safe_margin_var": true
         },
-        "Root Carbon Rib": {
+        "翼根カーボンリブ": {
             "cr_root_in_act": true,
             "cr_root_out_act": true,
             "cr_root_out_te": false
         },
-        "Tip Carbon Rib": {
+        "翼端カーボンリブ": {
             "cr_tip_in_act": true,
             "cr_tip_out_act": true,
             "cr_tip_out_te": false
         },
-        "Carbon Ribs General": {
+        "カーボンリブ": {
             "cr_thick": "0.2"
         },
-        "Rib Cap 1": {
+        "リブキャップ1": {
             "rc1_act": true,
             "rc1_end": "100",
             "rc1_start": "65",
             "rc1_thick": "0.1",
             "rc1_width": "8"
         },
-        "Rib Cap 2": {
+        "リブキャップ2": {
             "rc2_act": true,
             "rc2_end": "-100",
             "rc2_start": "-10",
             "rc2_thick": "0.1",
             "rc2_width": "8"
         },
-        "General": {
+        "リブ": {
             "rib_thick": "10"
         }
     },
-    "Brace & Connector": {
-        "Cross Bracing": {
+    "Xブレース・コネクタ": {
+        "Xブレース": {
             "xbrace_dia": "30.0",
             "xbrace_wire_dia": "2",
             "xbrace_offset": "13.4",
@@ -168,7 +162,7 @@
             "xb_end_b": "2524.0",
             "xb_end_c": "3570.5"
         },
-        "Joint Sleeve 1": {
+        "接合部1": {
             "js1_act": true,
             "js1_type": "Carbon Cylinder",
             "js1_start": "10",
@@ -177,7 +171,7 @@
             "js1_t1": "3",
             "js1_t2": "1"
         },
-        "Joint Sleeve 2": {
+        "接合部2": {
             "js2_act": true,
             "js2_type": "Carbon Cylinder",
             "js2_start": "170",
@@ -186,17 +180,17 @@
             "js2_t1": "3",
             "js2_t2": "1"
         },
-        "Diag Connector 1": {
+        "斜めコネクタ1": {
             "diag1_active": false,
             "diag1_y_main": "1176",
             "diag1_y_rear": "1647.5"
         },
-        "Diag Connector 2": {
+        "斜めコネクタ2": {
             "diag2_active": false,
             "diag2_y_main": "2224",
             "diag2_y_rear": "1752.5"
         },
-        "Connectors": {
+        "コネクタ": {
             "conn1_type": "Y-Shape",
             "conn1_y": "429.5",
             "conn2_type": "V-Shape (In=Up)",
@@ -204,11 +198,11 @@
             "conn3_type": "V-Shape (Out=Up)",
             "conn3_y": "2524",
             "conn4_type": "Y-Shape",
-            "conn4_y": "3570.5"
+            "conn4_y": ""
         }
     },
     "Foam": {
-        "Foam Cutter": {
+        "フォームカッター": {
             "foam_cut_kerf": "1",
             "foam_wire_dist": "1300",
             "foam_offset_x": "0.0",
@@ -220,7 +214,7 @@
         }
     },
     "Export3D": {
-        "Parts Output": {
+        "出力部品": {
             "export_carbon_ribs": true,
             "export_connectors": true,
             "export_diag_spars": true,
@@ -233,11 +227,12 @@
             "export_ribs": true,
             "export_stringers": true,
             "export_te": true,
+            "export_te_balsa": true,
             "export_te_caps": true,
             "export_xbrace_wires": true,
             "export_joint_sleeves": true
         },
-        "Materials": {
+        "材質": {
             "mat_carbon_ribs": "Carbon (Black)",
             "mat_connectors": "Carbon (Black)",
             "mat_diag_spars": "Carbon (Black)",
@@ -253,12 +248,13 @@
             "mat_ribs": "Styrofoam (Blue)",
             "mat_stringers": "Wood (Brown)",
             "mat_te": "Styrofoam (Blue)",
+            "mat_te_balsa": "Wood (Brown)",
             "mat_te_caps": "Carbon (Black)",
             "mat_xbrace_wires": "Kevlar (Yellow)"
         }
     },
-    "Jig": {
-        "Jig Settings": {
+    "ジグ": {
+        "ジグ設定": {
             "jig_y_positions": "690,1738,2262,3310",
             "jig_base_height": "120",
             "jig_base_thickness": "50",
@@ -271,12 +267,13 @@
         }
     },
     "DXF": {
-        "Layers": {
+        "レイヤー": {
             "dxf_layer_rib_outline": true,
             "dxf_layer_holes": true,
             "dxf_layer_truss": true,
             "dxf_layer_plank": true,
             "dxf_layer_te_part": true,
+            "dxf_layer_te_balsa": true,
             "dxf_layer_jig_outline": true
         },
         "Options": {

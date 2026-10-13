@@ -79,6 +79,11 @@ class RibParameters:
     rc2_start: float
     rc2_end: float
     rc2_thick: float
+    te_balsa_act: bool = False
+    te_balsa_start: float = -90.0
+    te_balsa_end: float = 90.0
+    te_balsa_thick: float = 1.0
+    is_carbon: bool = False
     bolt1_dx: float = 0.0
     truss_scale_front_list: List[float] = field(default_factory=list)
     truss_scale_rear_list: List[float] = field(default_factory=list)
@@ -118,6 +123,8 @@ class RibGenerationResult(NamedTuple):
     te_cap_pts_list: List[Any]
     rc_cap_pts_list: List[Any]
     tab_centers: Any = None
+    te_balsa_pts: Any = None
+    te_balsa_holes: Any = None
 
 
 # ==========================================
@@ -200,6 +207,85 @@ class RibGeneratorEngine:
         x_interp = np.interp(target_distances, distances, points[:, 0])
         y_interp = np.interp(target_distances, distances, points[:, 1])
         return np.column_stack((x_interp, y_interp))
+
+    def resample_curve(self, pts, n):
+        if len(pts) == 0: return pts
+        dists = np.cumsum(np.linalg.norm(np.diff(pts, axis=0), axis=1))
+        dists = np.insert(dists, 0, 0)
+        if dists[-1] == 0:
+            return np.tile(pts[0], (n, 1))
+        targets = np.linspace(0, dists[-1], n)
+        return np.column_stack([
+            np.interp(targets, dists, pts[:, 0]),
+            np.interp(targets, dists, pts[:, 1])
+        ])
+
+    def resample_te_polygon(self, te_poly, P_u_rot_te=None, P_l_rot_te=None, num_lower=50, num_cut=10, num_upper=50):
+        if te_poly is None or getattr(te_poly, 'is_empty', True):
+            return np.array([])
+        if getattr(te_poly, 'geom_type', '') == 'MultiPolygon':
+            te_poly = max(te_poly.geoms, key=lambda a: a.area)
+        if getattr(te_poly, 'geom_type', '') != 'Polygon' or not hasattr(te_poly, 'exterior'):
+            return np.array([])
+            
+        c = np.array(te_poly.exterior.coords)
+        if len(c) < 4:
+            return c
+            
+        poly = Polygon(c)
+        if not poly.exterior.is_ccw:
+            c = c[::-1]
+            
+        if P_u_rot_te is not None and P_l_rot_te is not None:
+            idx_u = int(np.argmin(np.linalg.norm(c[:-1] - P_u_rot_te, axis=1)))
+            idx_l = int(np.argmin(np.linalg.norm(c[:-1] - P_l_rot_te, axis=1)))
+            n = len(c) - 1
+            if (idx_l + 1) % n == idx_u:
+                cut_idx = idx_l
+            elif (idx_u + 1) % n == idx_l:
+                cut_idx = idx_u
+            else:
+                mid_x = (c[:-1, 0] + c[1:, 0]) / 2.0
+                dy = np.abs(c[1:, 1] - c[:-1, 1])
+                cut_idx = int(np.argmin(mid_x - 5.0 * dy))
+        else:
+            mid_x = (c[:-1, 0] + c[1:, 0]) / 2.0
+            dy = np.abs(c[1:, 1] - c[:-1, 1])
+            cut_idx = int(np.argmin(mid_x - 5.0 * dy))
+            
+        p_lower = c[cut_idx]
+        p_upper = c[cut_idx + 1]
+        
+        outer_pts = np.vstack([c[cut_idx+1:], c[1:cut_idx+1]])
+        
+        cut_vec = p_upper - p_lower
+        te_dir = np.array([cut_vec[1], -cut_vec[0]])
+        cut_mid = (p_upper + p_lower) / 2.0
+        if np.dot(te_dir, np.mean(outer_pts, axis=0) - cut_mid) < 0:
+            te_dir = -te_dir
+        norm_te_dir = np.linalg.norm(te_dir)
+        if norm_te_dir > 1e-6:
+            te_dir = te_dir / norm_te_dir
+            
+        proj = outer_pts.dot(te_dir)
+        te_idx = int(np.argmax(proj))
+        
+        upper_pts = outer_pts[:te_idx+1]
+        lower_pts = outer_pts[te_idx:]
+        cut_edge = np.array([p_lower, p_upper])
+        
+        res_upper = self.resample_curve(upper_pts, num_upper + 1)
+        res_lower = self.resample_curve(lower_pts, num_lower + 1)
+        res_cut   = self.resample_curve(cut_edge,  num_cut + 1)
+        
+        combined = np.vstack([
+            res_lower[:-1],
+            res_cut[:-1],
+            res_upper[:-1],
+            res_lower[0]
+        ])
+        return combined
+
 
     def get_loop_curve(self, u_x, u_y, l_x, l_y, chord):
         l_x_rev = l_x[::-1]
@@ -483,6 +569,79 @@ class RibGeneratorEngine:
             
         return rib_poly, (cap_pts1, cap_pts2)
 
+    def apply_te_balsa(self, rib_poly, u_x_orig, u_y_orig, l_x_orig, l_y_orig, chord, spar_x, spar_y, R_mat,
+                       te_balsa_act, te_balsa_start, te_balsa_end, te_cut):
+        if not SHAPELY_AVAILABLE or not te_balsa_act:
+            return rib_poly, []
+
+        s1 = float(te_balsa_start)
+        s2 = float(te_balsa_end)
+        if s1 == s2:
+            return rib_poly, []
+
+        # Determine TE cut points
+        if te_cut > 0:
+            u_pts_rev = np.column_stack((u_x_orig[::-1], u_y_orig[::-1]))
+            dist_u = np.zeros(len(u_pts_rev))
+            dist_u[1:] = np.cumsum(np.linalg.norm(np.diff(u_pts_rev, axis=0), axis=1))
+
+            l_pts_rev = np.column_stack((l_x_orig[::-1], l_y_orig[::-1]))
+            dist_l = np.zeros(len(l_pts_rev))
+            dist_l[1:] = np.cumsum(np.linalg.norm(np.diff(l_pts_rev, axis=0), axis=1))
+
+            p_cut_u = np.array([float(np.interp(te_cut, dist_u, u_pts_rev[:, 0])),
+                                float(np.interp(te_cut, dist_u, u_pts_rev[:, 1]))])
+            p_cut_l = np.array([float(np.interp(te_cut, dist_l, l_pts_rev[:, 0])),
+                                float(np.interp(te_cut, dist_l, l_pts_rev[:, 1]))])
+        else:
+            p_cut_u = np.array([float(u_x_orig[-1]), float(u_y_orig[-1])])
+            p_cut_l = np.array([float(l_x_orig[-1]), float(l_y_orig[-1])])
+
+        # Determine lower and upper surface targets
+        if s1 <= 0 and s2 >= 0:
+            pct_low = abs(s1)
+            pct_up = abs(s2)
+        elif s2 <= 0 and s1 >= 0:
+            pct_low = abs(s2)
+            pct_up = abs(s1)
+        else:
+            pct_low = abs(s1)
+            pct_up = abs(s2)
+
+        x_up_target = min(p_cut_u[0], (pct_up / 100.0) * chord)
+        y_up = float(np.interp(x_up_target, u_x_orig, u_y_orig))
+        p_up = np.array([x_up_target, y_up])
+
+        x_low_target = min(p_cut_l[0], (pct_low / 100.0) * chord)
+        y_low = float(np.interp(x_low_target, l_x_orig, l_y_orig))
+        p_low = np.array([x_low_target, y_low])
+
+        u_mid = [[float(u_x_orig[i]), float(u_y_orig[i])] for i in range(len(u_x_orig))
+                 if x_up_target < u_x_orig[i] < p_cut_u[0]]
+        l_mid = [[float(l_x_orig[i]), float(l_y_orig[i])] for i in range(len(l_x_orig) - 1, -1, -1)
+                 if x_low_target < l_x_orig[i] < p_cut_l[0]]
+
+        balsa_pts = [p_up]
+        balsa_pts.extend(u_mid)
+        balsa_pts.append(p_cut_u)
+        if te_cut > 0 or np.linalg.norm(p_cut_u - p_cut_l) > 1e-4:
+            balsa_pts.append(p_cut_l)
+        balsa_pts.extend(l_mid)
+        balsa_pts.append(p_low)
+        balsa_pts.append(p_up) # Ensure closed loop for preview and polyline
+
+        balsa_pts = np.array(balsa_pts)
+        rot_balsa = (balsa_pts - [spar_x, spar_y]).dot(R_mat.T) + [spar_x, spar_y]
+
+        try:
+            poly = Polygon(rot_balsa).buffer(0)
+            if poly.is_empty or poly.area < 1e-3:
+                return rib_poly, []
+        except Exception:
+            return rib_poly, []
+
+        return rib_poly, rot_balsa
+
     def apply_te_caps(self, rib_poly, u_x_orig, u_y_orig, l_x_orig, l_y_orig, te_cut, cap_thick, spar_x, spar_y, R_mat,
                       uf_act, uf_w, ur_act, ur_w, lf_act, lf_w, lr_act, lr_w):
         if not SHAPELY_AVAILABLE or te_cut <= 0:
@@ -524,7 +683,7 @@ class RibGeneratorEngine:
                 surf_pts = [p_start]
                 if len(inner_pts) > 0: surf_pts.extend(inner_pts)
                 surf_pts.append(p_end)
-                surf_pts = np.array(surf_pts)
+                surf_pts = self.resample_curve(np.array(surf_pts), 20)
                 
                 n_pts = len(surf_pts)
                 in_bound, out_bound, cap_surf = [], [], []
@@ -806,6 +965,11 @@ class RibGeneratorEngine:
         rc2_start = p.rc2_start
         rc2_end = p.rc2_end
         rc2_thick = p.rc2_thick
+        te_balsa_act = p.te_balsa_act
+        te_balsa_start = p.te_balsa_start
+        te_balsa_end = p.te_balsa_end
+        te_balsa_thick = p.te_balsa_thick
+        is_carbon = p.is_carbon
         bolt1_dx = p.bolt1_dx
         bolt1_dy = p.bolt1_dy
         bolt1_dia = p.bolt1_dia
@@ -894,6 +1058,7 @@ class RibGeneratorEngine:
         stringer_pts_list = []
         te_cap_pts_list = []
         rc_cap_pts_list = []
+        te_balsa_pts = None
 
         if SHAPELY_AVAILABLE:
             try: final_rib_mod_poly = Polygon(final_rib_mod).buffer(0)
@@ -927,6 +1092,13 @@ class RibGeneratorEngine:
                 rc_cap_pts_list = rc_cap_pts_tuple
             else:
                 rc_cap_pts_list = ([], [])
+
+            if final_rib_mod_poly and te_balsa_act and not is_carbon:
+                _, te_balsa_pts = self.apply_te_balsa(
+                    final_rib_mod_poly, u_x_orig, u_y_orig, l_x_orig, l_y_orig,
+                    chord, spar_x, spar_y, R_mat,
+                    te_balsa_act, te_balsa_start, te_balsa_end, te_cut
+                )
             
             te_part_coords = []
             if final_rib_mod_poly and P_u_rot is not None and P_l_rot is not None:
@@ -934,11 +1106,17 @@ class RibGeneratorEngine:
                 te_poly = self.cut_polygon_by_line(final_rib_mod_poly, P_u_rot_te, P_l_rot_te, 'right')
                 final_rib_mod_poly = main_poly
                 if getattr(te_poly, 'is_empty', True) == False:
-                    te_part_coords = np.array(te_poly.exterior.coords)
+                    te_resampled = self.resample_te_polygon(te_poly, P_u_rot_te, P_l_rot_te)
+                    if len(te_resampled) > 0:
+                        te_part_coords = te_resampled
+                    else:
+                        te_part_coords = np.array(te_poly.exterior.coords)
                     
             # Removed vertical spar tab logic as it is replaced by E-shape supports in cam_engine.py
 
-            final_rib_mod = np.array(final_rib_mod_poly.exterior.coords) if final_rib_mod_poly and not final_rib_mod_poly.is_empty else []
+            if final_rib_mod_poly and getattr(final_rib_mod_poly, 'geom_type', '') == 'MultiPolygon':
+                final_rib_mod_poly = max(final_rib_mod_poly.geoms, key=lambda a: a.area)
+            final_rib_mod = np.array(final_rib_mod_poly.exterior.coords) if final_rib_mod_poly and not final_rib_mod_poly.is_empty and hasattr(final_rib_mod_poly, 'exterior') else []
         else:
             te_part_coords = []
             final_rib_mod_poly = None
@@ -1056,9 +1234,21 @@ class RibGeneratorEngine:
             if diag_params_list:
                 for diag_params in diag_params_list:
                     try:
-                        vec = c_r - c_m
-                        dist_L = np.linalg.norm(vec)
-                        if dist_L > 0:
+                        if 'C1' in diag_params and 'C2' in diag_params:
+                            C1 = np.array(diag_params['C1'])
+                            C2 = np.array(diag_params['C2'])
+                            R_diag = diag_params['R']
+                            t_thick = diag_params['t']
+                        elif 'rel_C1' in diag_params and 'rel_C2' in diag_params:
+                            C1 = c_m + np.array(diag_params['rel_C1'])
+                            C2 = c_m + np.array(diag_params['rel_C2'])
+                            R_diag = diag_params['R']
+                            t_thick = diag_params['t']
+                        else:
+                            vec = c_r - c_m
+                            dist_L = np.linalg.norm(vec)
+                            if dist_L <= 0:
+                                continue
                             u = vec / dist_L
                             P_start = c_m + u * (spar_hole_dia / 2.0)
                             P_end = c_r - u * (rear_dia / 2.0)
@@ -1070,35 +1260,35 @@ class RibGeneratorEngine:
                             
                             C1 = P_start + t1 * (P_end - P_start)
                             C2 = P_start + t2 * (P_end - P_start)
-                            
-                            L_C = np.linalg.norm(C2 - C1)
-                            if L_C < 1e-5:
-                                diag_poly = Point(C1).buffer(R_diag).buffer(0)
+                        
+                        L_C = np.linalg.norm(C2 - C1)
+                        if L_C < 1e-5:
+                            diag_poly = Point(C1).buffer(R_diag).buffer(0)
+                        else:
+                            u_c = (C2 - C1) / L_C
+                            if t_thick <= 1e-5:
+                                S = 0
                             else:
-                                u_c = (C2 - C1) / L_C
-                                if t_thick <= 1e-5:
-                                    S = 0
-                                else:
-                                    S = R_diag * (np.sqrt(L_C**2 + t_thick**2) / t_thick - 1)
-                                E1 = C1 - u_c * S
-                                E2 = C2 + u_c * S
-                                diag_poly = LineString([E1, E2]).buffer(R_diag).buffer(0)
-                                
-                            if diag_poly and diag_poly.is_valid and not diag_poly.is_empty:
-                                if getattr(diag_poly, 'geom_type', '') == 'Polygon':
-                                    diag_pts = np.array(diag_poly.exterior.coords)
-                                elif getattr(diag_poly, 'geom_type', '') == 'MultiPolygon':
-                                    diag_poly = max(diag_poly.geoms, key=lambda a: a.area)
-                                    diag_pts = np.array(diag_poly.exterior.coords)
-                                else:
-                                    diag_pts = []
-                                
-                                if len(diag_pts) > 0:
-                                    diag_poly_pts_list.append(diag_pts)
-                                
-                                diag_obs = diag_poly.buffer(margin_outer).buffer(0)
-                                if not diag_obs.is_empty:
-                                    active_obs_list.append(diag_obs)
+                                S = R_diag * (np.sqrt(L_C**2 + t_thick**2) / t_thick - 1)
+                            E1 = C1 - u_c * S
+                            E2 = C2 + u_c * S
+                            diag_poly = LineString([E1, E2]).buffer(R_diag).buffer(0)
+                            
+                        if diag_poly and diag_poly.is_valid and not diag_poly.is_empty:
+                            if getattr(diag_poly, 'geom_type', '') == 'Polygon':
+                                diag_pts = np.array(diag_poly.exterior.coords)
+                            elif getattr(diag_poly, 'geom_type', '') == 'MultiPolygon':
+                                diag_poly = max(diag_poly.geoms, key=lambda a: a.area)
+                                diag_pts = np.array(diag_poly.exterior.coords)
+                            else:
+                                diag_pts = []
+                            
+                            if len(diag_pts) > 0:
+                                diag_poly_pts_list.append(diag_pts)
+                            
+                            diag_obs = diag_poly.buffer(margin_outer).buffer(0)
+                            if not diag_obs.is_empty:
+                                active_obs_list.append(diag_obs)
                     except Exception:
                         pass
 
@@ -1326,12 +1516,42 @@ class RibGeneratorEngine:
             except Exception:
                 pass
 
+        # --- TE Balsa Hole Cutting ---
+        te_balsa_holes = []
+        if SHAPELY_AVAILABLE and te_balsa_pts is not None and len(te_balsa_pts) >= 3:
+            try:
+                balsa_poly = Polygon(te_balsa_pts).buffer(0)
+                balsa_cutters = []
+                # 1. Straight rear spar hole
+                if rear_dia > 0 and len(c_r) >= 2:
+                    balsa_cutters.append(Point(c_r).buffer(rear_dia / 2.0).buffer(0))
+                # 2. Diagonal / Cutoff slanted rear spar holes
+                for dp in diag_poly_pts_list:
+                    if len(dp) >= 3:
+                        balsa_cutters.append(Polygon(dp).buffer(0))
+                
+                if balsa_cutters:
+                    cutter_union = unary_union(balsa_cutters).buffer(0)
+                    if balsa_poly.intersects(cutter_union):
+                        balsa_diff = balsa_poly.difference(cutter_union).buffer(0)
+                        if getattr(balsa_diff, 'geom_type', '') == 'MultiPolygon':
+                            balsa_diff = max(balsa_diff.geoms, key=lambda a: a.area)
+                        
+                        if not balsa_diff.is_empty and balsa_diff.area > 1e-3:
+                            te_balsa_pts = np.array(balsa_diff.exterior.coords)
+                            te_balsa_holes = [np.array(interior.coords) for interior in balsa_diff.interiors if len(interior.coords) >= 3]
+                        else:
+                            te_balsa_pts = None
+                            te_balsa_holes = []
+            except Exception:
+                pass
+
         return RibGenerationResult(
             final_rib_mod, c_m, hole_m, c_r, hole_r, c_f, hole_f, final_truss_holes, 
             xb_r_active, [xb['abs_ct'] for xb in active_xbs], xb_r_skipped, [xb['abs_ct'] for xb in skipped_xbs], 
             warnings_list, plank_poly_rot, te_part_coords, c_b1, hole_b1, c_b2, hole_b2, 
             diag_poly_pts_list, final_rib_orig, stringer_pts_list, te_cap_pts_list, rc_cap_pts_list,
-            tab_centers
+            tab_centers, te_balsa_pts, te_balsa_holes
         )
 
     def get_local_params(self, p: Dict[str, Any], y_local: float) -> Tuple[float, float, float, float, float, float]:
@@ -1349,6 +1569,10 @@ class RibGeneratorEngine:
         x_dia = 0.0
         for start, end, offset in p['xb_zones']:
             if start is not None and end is not None:
+                if p.get('rear_spar_cutoff_act', False):
+                    y_conn_end = p.get('rear_spar_main_conn', 800.0)
+                    if p.get('rear_spar_cutoff_start', 500.0) < y_conn_end and (start > y_conn_end or end > y_conn_end):
+                        continue
                 # Wire 1: Main (start - offset) to Rear (end)
                 m1_y = start - offset
                 r1_y = end
@@ -1425,10 +1649,93 @@ class RibGeneratorEngine:
 
         rear_dx = rear_dx_root * (1 - blend) + rear_dx_tip * blend
         rear_dy = rear_dy_root * (1 - blend) + rear_dy_tip * blend
+        
+        rear_dia = p['rear_spar_dia']
+        if p.get('rear_spar_cutoff_act', False):
+            try:
+                y_start_cutoff = float(p.get('rear_spar_cutoff_start', 500.0))
+            except (ValueError, TypeError):
+                y_start_cutoff = 500.0
+            try:
+                y_conn = float(p.get('rear_spar_main_conn', 800.0))
+            except (ValueError, TypeError):
+                y_conn = 800.0
+
+            if y_start_cutoff < y_conn:
+                joint_len = p.get('joint_length', 0.0)
+                y_positions = p.get('y_positions', [])
+                cutoff_y_locals = [y for y in y_positions if (y + joint_len) <= y_start_cutoff]
+                if cutoff_y_locals:
+                    last_y_local = cutoff_y_locals[-1]
+                    y_start_actual = last_y_local + joint_len
+                    _, _, last_washout, last_blend, _, _ = self.get_local_params(p, last_y_local)
+                    rdx_s = rear_dx_root * (1 - last_blend) + rear_dx_tip * last_blend
+                    rdy_s = rear_dy_root * (1 - last_blend) + rear_dy_tip * last_blend
+                    w_theta_s = np.radians(last_washout)
+                    R_mat_s = np.array([[np.cos(w_theta_s), -np.sin(w_theta_s)], [np.sin(w_theta_s), np.cos(w_theta_s)]])
+                    delta_s = np.array([rdx_s, rdy_s]).dot(R_mat_s.T)
+                    X_start = delta_s[0]
+                    Z_start = delta_s[1]
+                else:
+                    y_start_actual = y_start_cutoff
+                    _, _, last_washout, last_blend, _, _ = self.get_local_params(p, max(0.0, y_start_cutoff - joint_len))
+                    rdx_s = rear_dx_root * (1 - last_blend) + rear_dx_tip * last_blend
+                    rdy_s = rear_dy_root * (1 - last_blend) + rear_dy_tip * last_blend
+                    w_theta_s = np.radians(last_washout)
+                    R_mat_s = np.array([[np.cos(w_theta_s), -np.sin(w_theta_s)], [np.sin(w_theta_s), np.cos(w_theta_s)]])
+                    delta_s = np.array([rdx_s, rdy_s]).dot(R_mat_s.T)
+                    X_start = delta_s[0]
+                    Z_start = delta_s[1]
+
+                if y_global > y_start_actual:
+                    rear_dia = -1.0
+                    rear_dx = 0.0
+                    rear_dy = 0.0
+
+                    # 打ち切り区間（y_start_actual < y_global < y_conn）に位置するリブには斜めリアスパ穴とトラス回避を生成
+                    if y_global < y_conn and p.get('rear_spar_dia', 0.0) > 0 and y_conn > y_start_actual:
+                        Y1 = max(y_start_actual, min(y_conn, y_global))
+                        Y2 = max(y_start_actual, min(y_conn, y_global + thickness))
+
+                        alpha1 = (y_conn - Y1) / (y_conn - y_start_actual)
+                        alpha2 = (y_conn - Y2) / (y_conn - y_start_actual)
+
+                        rel_C1 = (alpha1 * X_start, alpha1 * Z_start)
+                        rel_C2 = (alpha2 * X_start, alpha2 * Z_start)
+
+                        diag_params.append({
+                            'rel_C1': rel_C1,
+                            'rel_C2': rel_C2,
+                            'R': p['rear_spar_dia'] / 2.0,
+                            't': thickness
+                        })
+
+
+        te_balsa_act = p.get('te_balsa_act', False)
+        if te_balsa_act:
+            def _is_act(val):
+                if isinstance(val, bool): return val
+                if isinstance(val, (int, float)): return val != 0
+                if isinstance(val, str): return val.strip().lower() in ('true', '1', 'yes')
+                return False
+
+            root_carbon_active = (
+                _is_act(p.get('cr_root_in_act')) or
+                _is_act(p.get('cr_root_out_act')) or
+                any(c.get('loc') == 'root' and _is_act(c.get('act')) for c in p.get('carbon_rib_configs', []))
+            )
+            tip_carbon_active = (
+                _is_act(p.get('cr_tip_in_act')) or
+                _is_act(p.get('cr_tip_out_act')) or
+                any(c.get('loc') == 'tip' and _is_act(c.get('act')) for c in p.get('carbon_rib_configs', []))
+            )
+
+            if (is_root and root_carbon_active) or (is_tip and tip_carbon_active):
+                te_balsa_act = False
 
         params_obj = RibParameters(
             file1=p['file1'], file2=p['file2'], blend_ratio=blend, chord=chord, spar_pct=spar_pct, washout_deg=washout,
-            spar_hole_dia=p['spar_hole_dia'], spar_hole_dv=p.get('spar_hole_dv', 0.0) or p['spar_hole_dia'], rear_dx=rear_dx, rear_dy=rear_dy, rear_dia=p['rear_spar_dia'],
+            spar_hole_dia=p['spar_hole_dia'], spar_hole_dv=p.get('spar_hole_dv', 0.0) or p['spar_hole_dia'], rear_dx=rear_dx, rear_dy=rear_dy, rear_dia=rear_dia,
             front_dx=front_dx, front_dy=front_dy, front_dia=p['front_spar_dia'],
             truss_angle=angle, truss_front_n=p['truss_front_n'], truss_rear_n=p['truss_rear_n'],
             truss_scale_front_list=[float(x) for x in str(p.get('truss_scale_front', '')).split(',') if x.strip()],
@@ -1447,6 +1754,11 @@ class RibGeneratorEngine:
             te_cap_thick=p['te_cap_thick'],
             rc1_act=p['rc1_act'], rc1_start=p['rc1_start'], rc1_end=p['rc1_end'], rc1_thick=p['rc1_thick'],
             rc2_act=p['rc2_act'], rc2_start=p['rc2_start'], rc2_end=p['rc2_end'], rc2_thick=p['rc2_thick'],
+            te_balsa_act=te_balsa_act,
+            te_balsa_start=float(p.get('te_balsa_start', -90.0)),
+            te_balsa_end=float(p.get('te_balsa_end', 90.0)),
+            te_balsa_thick=float(p.get('te_balsa_thick', 1.0)),
+            is_carbon=is_carbon,
             bolt1_dx=b1[0], bolt1_dy=b1[1], bolt1_dia=b1[2],
             bolt2_dx=b2[0], bolt2_dy=b2[1], bolt2_dia=b2[2],
             diag_params_list=diag_params, fast_mode=p.get('fast_mode', False),
@@ -1459,7 +1771,7 @@ class RibGeneratorEngine:
         
         return self.generate_single_rib(params_obj)
 
-    def export_dxf(self, filepath, origin, rib_pts, c_m, d_m, c_f, d_f, c_r, d_r, truss_holes, xb_centers, d_xb, plank_poly, te_part, c_b1, d_b1, hole_b1, c_b2, d_b2, hole_b2, diag_poly_pts_list, te_cap_pts_list=None, rc_cap_pts_list=None, jig_pts=None, doc=None, msp=None, offset=(0,0), layer_flags=None):
+    def export_dxf(self, filepath, origin, rib_pts, c_m, d_m, c_f, d_f, c_r, d_r, truss_holes, xb_centers, d_xb, plank_poly, te_part, c_b1, d_b1, hole_b1, c_b2, d_b2, hole_b2, diag_poly_pts_list, te_cap_pts_list=None, rc_cap_pts_list=None, jig_pts=None, doc=None, msp=None, offset=(0,0), layer_flags=None, te_balsa_pts=None, te_balsa_holes=None):
         if ezdxf is None: raise ImportError("ezdxf is required.")
         if layer_flags is None:
             layer_flags = {}
@@ -1479,6 +1791,7 @@ class RibGeneratorEngine:
             doc.layers.add(name='JIG_OUTLINE', color=5)
             doc.layers.add(name='TE_CAPS', color=6)
             doc.layers.add(name='RIB_CAPS', color=5)
+            doc.layers.add(name='TE_BALSA', color=3)
         except Exception:
             try:
                 doc.layers.new(name='RIB_OUTLINE', dxfattribs={'color': 7})
@@ -1489,6 +1802,7 @@ class RibGeneratorEngine:
                 doc.layers.new(name='JIG_OUTLINE', dxfattribs={'color': 5})
                 doc.layers.new(name='TE_CAPS', dxfattribs={'color': 6})
                 doc.layers.new(name='RIB_CAPS', dxfattribs={'color': 5})
+                doc.layers.new(name='TE_BALSA', dxfattribs={'color': 3})
             except Exception:
                 pass
 
@@ -1523,6 +1837,14 @@ class RibGeneratorEngine:
             if rc_cap_pts_list is not None:
                 for cap_pts in rc_cap_pts_list[0] + rc_cap_pts_list[1]:
                     if len(cap_pts) > 0: msp.add_lwpolyline(shift_poly(cap_pts), close=True, dxfattribs={'layer': 'RIB_CAPS'})
+
+        if layer_flags.get('dxf_layer_te_balsa', True):
+            if te_balsa_pts is not None and len(te_balsa_pts) > 0:
+                msp.add_lwpolyline(shift_poly(te_balsa_pts), close=True, dxfattribs={'layer': 'TE_BALSA'})
+            if te_balsa_holes is not None:
+                for bh in te_balsa_holes:
+                    if len(bh) > 0:
+                        msp.add_lwpolyline(shift_poly(bh), close=True, dxfattribs={'layer': 'TE_BALSA'})
 
         if layer_flags.get('dxf_layer_jig_outline', True):
             if jig_pts is not None and len(jig_pts) > 0: msp.add_lwpolyline(shift_poly(jig_pts), close=True, dxfattribs={'layer': 'JIG_OUTLINE'})
@@ -1582,6 +1904,19 @@ class RibGeneratorEngine:
         rear_dy_tip = p.get('rear_spar_dy_tip', p.get('rear_spar_dy', 0.0))
         rear_dx = rear_dx_root * (1 - t) + rear_dx_tip * t
         rear_dy = rear_dy_root * (1 - t) + rear_dy_tip * t
+        
+        y_global = y_local + p.get('joint_length', 0.0)
+        
+        if p.get('rear_spar_cutoff_act', False):
+            y_start = p.get('rear_spar_cutoff_start', 500.0)
+            y_conn = p.get('rear_spar_main_conn', 800.0)
+            if y_start < y_conn:
+                # 打ち切り開始以降はリアスパ無効。斜めコネクタはexport_3d側で生成。
+                if y_global > y_start:
+                    d_r = -1.0
+                    rear_dx = 0.0
+                    rear_dy = 0.0
+
         
         try:
             pts1 = self.load_dat(p.get('file1', ''))

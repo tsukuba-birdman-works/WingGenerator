@@ -38,8 +38,15 @@ class Wing3DBuilder:
 
             # Spars
             main_spar_centers.append([0.0, y_ext, 0.0])
-            if self.p['front_spar_dia'] > 0: front_spar_centers.append([res[5][0] - c_m[0], y_ext, res[5][1] - c_m[1]])
-            if self.p['rear_spar_dia'] > 0: rear_spar_centers.append([res[3][0] - c_m[0], y_ext, res[3][1] - c_m[1]])
+            if self.p['front_spar_dia'] > 0 and len(res[6]) > 0: front_spar_centers.append([res[5][0] - c_m[0], y_ext, res[5][1] - c_m[1]])
+            # リアスパは打ち切り開始点以前のみ rear_spar_centers に追加する
+            # （打ち切り区間の斜めコネクタは _generate_diag_connector_mesh で独立生成）
+            if self.p['rear_spar_dia'] > 0 and len(res[4]) > 0:
+                y_global_rib = (y_local + self.p.get('joint_length', 0.0))
+                cutoff_active = self.p.get('rear_spar_cutoff_act', False)
+                y_start_cutoff = self.p.get('rear_spar_cutoff_start', 500.0)
+                if not cutoff_active or y_global_rib <= y_start_cutoff:
+                    rear_spar_centers.append([res[3][0] - c_m[0], y_ext, res[3][1] - c_m[1]])
 
 
             # Bolt Spacers
@@ -99,6 +106,19 @@ class Wing3DBuilder:
                     y_start = y_global + self.p['rib_thick']/2.0 - self.p['rc2_width']/2.0
                     for pts in rc2_pts: scene_rib_data.append((y_start, self.p['rc2_width'], self._to_rel(pts, c_m), [], 'Rib_Cap'))
 
+            # TE Balsa
+            if self.p.get('export_te_balsa', True) and self.p.get('te_balsa_act', False):
+                te_balsa_pts = getattr(res, 'te_balsa_pts', None)
+                if te_balsa_pts is not None and len(te_balsa_pts) > 0:
+                    balsa_thick = float(self.p.get('te_balsa_thick', 1.0))
+                    y_global = y_local + self.p['joint_length']
+                    rel_balsa = self._to_rel(te_balsa_pts, c_m)
+                    te_balsa_holes = getattr(res, 'te_balsa_holes', None) or []
+                    rel_balsa_holes = [self._to_rel(bh, c_m) for bh in te_balsa_holes if len(bh) >= 3]
+                    # Sandwich: 2 plates on both sides of the rib
+                    scene_rib_data.append((y_global - balsa_thick, balsa_thick, rel_balsa, rel_balsa_holes, 'TE_Balsa'))
+                    scene_rib_data.append((y_global + self.p['rib_thick'], balsa_thick, rel_balsa, rel_balsa_holes, 'TE_Balsa'))
+
         # 2. カーボンリブのジオメトリ情報を生成
         if self.p['export_carbon_ribs']:
             self._generate_carbon_ribs_data(scene_rib_data)
@@ -130,6 +150,9 @@ class Wing3DBuilder:
         if self.p['export_diag_spars']: self._generate_diag_spar_meshes(other_meshes, main_spar_centers, rear_spar_centers)
         if self.p['export_xbrace_wires']: self._generate_xbrace_meshes(other_meshes, rear_spar_centers)
         if self.p.get('export_joint_sleeves', True): self._generate_joint_sleeves(other_meshes)
+        # 斜めコネクタ：リアスパ打ち切り点から主桶接続点への一本パイプ（リブ位置で分割されない赤レイヤー）
+        if self.p.get('rear_spar_cutoff_act', False) and self.p['export_rear_spar']:
+            self._generate_diag_connector_mesh(other_meshes, rear_spar_centers)
 
         # 4. 色情報を定義
         def get_mat_props(mat_key, default_rgba=[200, 200, 200, 255]):
@@ -143,6 +166,7 @@ class Wing3DBuilder:
             'Main_Spar': get_mat_props('mat_main_spar', [30,30,30,255]),
             'Front_Spar': get_mat_props('mat_front_spar', [30,30,30,255]),
             'Rear_Spar': get_mat_props('mat_rear_spar', [30,30,30,255]),
+            'Diag_Connector': get_mat_props('mat_rear_spar', [30,30,30,255]),  # リアスパと同素材
             'Plank_Skin': get_mat_props('mat_plank'),
             'TE_Skin': get_mat_props('mat_te'),
             'Connector': get_mat_props('mat_connectors', [30,30,30,255]),
@@ -152,6 +176,7 @@ class Wing3DBuilder:
             'CarbonRibs': get_mat_props('mat_carbon_ribs', [30,30,30,255]),
             'TE_Cap': get_mat_props('mat_te_caps', [30,30,30,255]),
             'Rib_Cap': get_mat_props('mat_rib_caps', [30,30,30,255]),
+            'TE_Balsa': get_mat_props('mat_te_balsa', [205, 170, 125, 255]),
             'JointSleeve_Cap': get_mat_props('mat_js_cap', [30, 30, 30, 255]),
             'JointSleeve_Foam': get_mat_props('mat_js_foam', [100, 100, 255, 255]),
             'JointSleeve_Skin': get_mat_props('mat_js_skin', [30, 30, 30, 255]),
@@ -180,7 +205,8 @@ class Wing3DBuilder:
         rib_data_to_export = [d for d in scene_rib_data if d[-1] != 'Ribs' or self.p.get('export_ribs', True)]
 
         scene_geoms = Wing3DExporter.build_scene_geoms(
-            rib_data_to_export, other_meshes, is_left_wing=is_left, part_colors=part_colors
+            rib_data_to_export, other_meshes, is_left_wing=is_left, part_colors=part_colors,
+            params=self.p
         )
 
         # リブ周長を計算（オフセットなし翻型輪郭）
@@ -211,7 +237,7 @@ class Wing3DBuilder:
         scene_rib_data, other_meshes, part_colors, _rib_orig, _te_span = self._collect_geometry_data()
         is_left = self.p['wing_type'] == "Left"
         rib_data_to_export = [d for d in scene_rib_data if d[-1] != 'Ribs' or self.p.get('export_ribs', True)]
-        Wing3DExporter.export_3d_scene(filepath, rib_data_to_export, other_meshes, is_left_wing=is_left, part_colors=part_colors)
+        Wing3DExporter.export_3d_scene(filepath, rib_data_to_export, other_meshes, is_left_wing=is_left, part_colors=part_colors, params=self.p)
 
     def _generate_rib_at_y(self, y_local, rib_index, thickness, is_carbon=False, te_cut_override=None):
         res = self.engine.generate_rib_at_y(self.p, y_local, rib_index, thickness, is_carbon, te_cut_override)
@@ -240,7 +266,17 @@ class Wing3DBuilder:
 
     def _generate_connector_meshes(self, meshes, main_spar_centers, rear_spar_centers):
         if self.p['rear_spar_dia'] <= 0 or not self.p['connectors'] or len(rear_spar_centers) < 2: return
-        p1_r, p2_r = np.array(rear_spar_centers[0]), np.array(rear_spar_centers[-1])
+        
+        def get_rear_pt(y_val):
+            for i in range(len(rear_spar_centers)-1):
+                pA = np.array(rear_spar_centers[i])
+                pB = np.array(rear_spar_centers[i+1])
+                if pA[1] <= y_val <= pB[1]:
+                    t = (y_val - pA[1]) / (pB[1] - pA[1]) if pB[1] != pA[1] else 0
+                    return pA + t * (pB - pA)
+            if y_val < rear_spar_centers[0][1]: return np.array(rear_spar_centers[0])
+            return np.array(rear_spar_centers[-1])
+
         R_main, r_conn = self.p['spar_hole_dia'] / 2.0, self.p['rear_spar_dia'] / 2.0
 
         # Construct solid representation of main and rear spars for boolean difference
@@ -250,6 +286,10 @@ class Wing3DBuilder:
 
         for i, (y_c, conn_type) in enumerate(self.p['connectors']):
             if y_c is None or y_c == '': continue # パラメータが空の場合はスキップ
+            if self.p.get('rear_spar_cutoff_act', False):
+                y_conn_end = self.p.get('rear_spar_main_conn', 800.0)
+                if self.p.get('rear_spar_cutoff_start', 500.0) < y_conn_end and y_c > y_conn_end:
+                    continue
             
             if conn_type.startswith("V-Shape"):
                 offset = r_conn
@@ -263,8 +303,7 @@ class Wing3DBuilder:
                 y_down = y_outer if inner_goes_up else y_inner
                 
                 # --- Upper Pipe ---
-                t_up = (y_up - p1_r[1]) / (p2_r[1] - p1_r[1]) if p2_r[1] != p1_r[1] else 0
-                p_rear_center_up = p1_r + t_up * (p2_r - p1_r)
+                p_rear_center_up = get_rear_pt(y_up)
                 p_main_center_up = np.array([0.0, y_up, 0.0])
                 
                 vec_up = p_main_center_up - p_rear_center_up
@@ -273,8 +312,7 @@ class Wing3DBuilder:
                 p_end_upper = np.array([0.0, y_up, R_main - r_conn])
                 
                 # --- Lower Pipe ---
-                t_down = (y_down - p1_r[1]) / (p2_r[1] - p1_r[1]) if p2_r[1] != p1_r[1] else 0
-                p_rear_center_down = p1_r + t_down * (p2_r - p1_r)
+                p_rear_center_down = get_rear_pt(y_down)
                 p_main_center_down = np.array([0.0, y_down, 0.0])
                 
                 vec_down = p_main_center_down - p_rear_center_down
@@ -295,8 +333,7 @@ class Wing3DBuilder:
                 meshes[f"Connector_{i}_upper"] = conn_upper
                 
             else:  # Y-Shape
-                t = (y_c - p1_r[1]) / (p2_r[1] - p1_r[1]) if p2_r[1] != p1_r[1] else 0
-                p_rear_center = p1_r + t * (p2_r - p1_r)
+                p_rear_center = get_rear_pt(y_c)
                 
                 p_main_center = np.array([0.0, y_c, 0.0])
                 
@@ -358,11 +395,15 @@ class Wing3DBuilder:
     def _generate_xbrace_meshes(self, meshes, rear_spar_centers):
         if not self.p['export_xbrace_wires'] or len(rear_spar_centers) < 2: return
 
-        p1_r = np.array(rear_spar_centers[0])
-        p2_r = np.array(rear_spar_centers[-1])
         def get_rear_pt(y_val):
-            t = (y_val - p1_r[1]) / (p2_r[1] - p1_r[1]) if p2_r[1] != p1_r[1] else 0
-            return p1_r + t * (p2_r - p1_r)
+            for i in range(len(rear_spar_centers)-1):
+                pA = np.array(rear_spar_centers[i])
+                pB = np.array(rear_spar_centers[i+1])
+                if pA[1] <= y_val <= pB[1]:
+                    t = (y_val - pA[1]) / (pB[1] - pA[1]) if pB[1] != pA[1] else 0
+                    return pA + t * (pB - pA)
+            if y_val < rear_spar_centers[0][1]: return np.array(rear_spar_centers[0])
+            return np.array(rear_spar_centers[-1])
 
         R_main = self.p['spar_hole_dia'] / 2.0
         r_conn = self.p['rear_spar_dia'] / 2.0
@@ -373,6 +414,10 @@ class Wing3DBuilder:
 
         for y_s, y_e, offset in self.p['xb_zones']:
             if y_s is None or y_e is None: continue
+            if self.p.get('rear_spar_cutoff_act', False):
+                y_conn_end = self.p.get('rear_spar_main_conn', 800.0)
+                if self.p.get('rear_spar_cutoff_start', 500.0) < y_conn_end and (y_s > y_conn_end or y_e > y_conn_end):
+                    continue
             p_rear_s, p_rear_e = get_rear_pt(y_s), get_rear_pt(y_e)
             y_m_s, y_m_e = p_rear_s[1] - offset, p_rear_e[1] + offset
 
@@ -419,6 +464,57 @@ class Wing3DBuilder:
             
             meshes[f"XBraceWire_{wire_idx}"] = Wing3DExporter.generate_swept_mesh([p_m1, p_c1], wire_radius); wire_idx += 1
             meshes[f"XBraceWire_{wire_idx}"] = Wing3DExporter.generate_swept_mesh([p_c2, p_m2], wire_radius); wire_idx += 1
+
+    def _generate_diag_connector_mesh(self, meshes, rear_spar_centers):
+        """
+        リアスパ打ち切りコネクタを一本の直線パイプとして生成する。
+
+        rear_spar_centers の末端点（打ち切り開始点の3D座標）から、
+        主桁上の接続点（y_conn の位置 = (0, y_conn_global, 0)）への
+        パイプを1本生成する。リブ位置で分割されないため完全に直線となる。
+        """
+        if len(rear_spar_centers) == 0:
+            return
+
+        y_conn_global = self.p.get('rear_spar_main_conn', 800.0)
+        r_pipe = self.p['rear_spar_dia'] / 2.0
+        R_main = self.p['spar_hole_dia'] / 2.0
+        inner = self.p.get('rear_spar_inner_dia', self.p['rear_spar_dia'] - 2.0) / 2.0
+
+        # 打ち切り開始点の3D座標（rear_spar_centers の最後の点）
+        p_cutoff = np.array(rear_spar_centers[-1])
+
+        # 接続先: 主桁軸上の y_conn の位置
+        p_conn = np.array([0.0, y_conn_global, 0.0])
+
+        # パイプの方向ベクトル（打ち切り点 → 主桁接続点）
+        vec = p_conn - p_cutoff
+        length = np.linalg.norm(vec)
+        if length < 1e-5:
+            return  # 距離が短すぎる場合はスキップ
+
+        u = vec / length
+
+        # 始点: 打ち切り点からパイプ半径分だけ主桁側にオフセット（リアスパ管内に埋まらないよう）
+        p_start = p_cutoff + u * r_pipe
+
+        # 終点: 主桁中心からパイプ半径分だけ手前にオフセット（主桁管内に埋まらないよう）
+        p_end = p_conn - u * R_main
+
+        if np.linalg.norm(p_end - p_start) < 1e-5:
+            return
+
+        diag_mesh = Wing3DExporter.generate_pipe_mesh([p_start.tolist(), p_end.tolist()], r_pipe, inner)
+
+        # Boolean差分: 主桁・リアスパとの交差部分を除去してきれいな接合にする
+        solid_main = Wing3DExporter.generate_swept_mesh([[0.0, 0.0, 0.0], [0.0, y_conn_global + R_main, 0.0]], R_main)
+        solid_rear = Wing3DExporter.generate_swept_mesh(rear_spar_centers, r_pipe) if len(rear_spar_centers) >= 2 else None
+        sub_meshes = [m for m in [solid_main, solid_rear] if m is not None]
+
+        if diag_mesh and sub_meshes:
+            diag_mesh = Wing3DExporter.blender_difference(diag_mesh, sub_meshes)
+
+        meshes['Diag_Connector'] = diag_mesh
 
     def _generate_joint_sleeves(self, meshes):
         joint_sleeves = self.p.get('joint_sleeves', [])
@@ -492,7 +588,7 @@ class Wing3DBuilder:
 
 class Wing3DExporter:
     @staticmethod
-    def build_scene_geoms(rib_data_list, other_meshes=None, is_left_wing=False, part_colors=None):
+    def build_scene_geoms(rib_data_list, other_meshes=None, is_left_wing=False, part_colors=None, params=None):
         """
         リブデータとother_meshesからジオメトリ辞書を構築して返す。
         ファイルへの書き出しは行わない。
@@ -507,6 +603,8 @@ class Wing3DExporter:
         if other_meshes is None: other_meshes = {}
         if part_colors is None:
             part_colors = {}
+        if params is None:
+            params = {}
         meshes = []
         last_err = ""
 
@@ -603,20 +701,31 @@ class Wing3DExporter:
             apply_color(rc_mesh, c)
             scene_geoms['Rib_Cap'] = rc_mesh
 
-        cutter_m_list = [m for m, k in meshes if k in ['Ribs_Cutter', 'CarbonRibs_Cutter']]
-        rib_sub_meshes = cutter_m_list if cutter_m_list else ribs_m_list + carbon_m_list
+        te_balsa_m_list = [m for m, k in meshes if k == 'TE_Balsa']
+        if te_balsa_m_list:
+            balsa_mesh = trimesh.util.concatenate(te_balsa_m_list)
+            c = part_colors.get('TE_Balsa', ([205, 170, 125, 255], 0.0, 0.8))
+            apply_color(balsa_mesh, c)
+            scene_geoms['TE_Balsa'] = balsa_mesh
+
+        cutter_pairs = [(m, k) for m, k in meshes if k in ['Ribs_Cutter', 'CarbonRibs_Cutter']]
+        if not cutter_pairs:
+            cutter_pairs = [(m, 'Ribs_Cutter') for m in ribs_m_list] + [(m, 'CarbonRibs_Cutter') for m in carbon_m_list]
         for name, m in other_meshes.items():
             if m is not None:
-                if name == "TE_Skin" and rib_sub_meshes:
+                if name == "TE_Skin" and cutter_pairs:
                     extended_subs = []
-                    for sub in rib_sub_meshes:
+                    balsa_thick = float(params.get('te_balsa_thick', 1.0))
+                    balsa_extra = (2.0 * balsa_thick) if params.get('te_balsa_act', False) else 0.0
+                    for sub, k in cutter_pairs:
                         try:
                             sub_ext = sub.copy()
                             y_min, y_max = sub_ext.bounds[:, 1]
                             y_center = (y_min + y_max) / 2.0
                             t = y_max - y_min
                             if t > 1e-5:
-                                scale = (t + 2.0) / t
+                                extra_w = (2.0 + balsa_extra) if k == 'Ribs_Cutter' else 2.0
+                                scale = (t + extra_w) / t
                                 t1 = np.eye(4)
                                 t1[1, 3] = -y_center
                                 s_mat = np.eye(4)
@@ -654,13 +763,13 @@ class Wing3DExporter:
         return scene_geoms
 
     @staticmethod
-    def export_3d_scene(filepath, rib_data_list, other_meshes=None, is_left_wing=False, part_colors=None):
+    def export_3d_scene(filepath, rib_data_list, other_meshes=None, is_left_wing=False, part_colors=None, params=None):
         """build_scene_geomsでジオメトリを構築したのちファイルに書き出す"""
         import trimesh
         import os
         import numpy as np
         scene_geoms = Wing3DExporter.build_scene_geoms(
-            rib_data_list, other_meshes, is_left_wing=is_left_wing, part_colors=part_colors
+            rib_data_list, other_meshes, is_left_wing=is_left_wing, part_colors=part_colors, params=params
         )
         scene = trimesh.Scene(geometry=scene_geoms)
 
@@ -852,23 +961,30 @@ class Wing3DExporter:
             for i in range(len(valid_curves)):
                 if np.linalg.norm(valid_curves[i][0] - valid_curves[i][-1]) > 1e-5:
                     valid_curves[i] = np.vstack([valid_curves[i], valid_curves[i][0]])
-                    
-                # Remove collinear points to preserve exact polygonal corners (essential for TE_Skin / Planks)
-                c = valid_curves[i]
-                simplified = [c[0]]
-                for j in range(1, len(c)-1):
-                    v1 = c[j] - simplified[-1]
-                    v2 = c[j+1] - c[j]
-                    n1 = np.linalg.norm(v1)
-                    n2 = np.linalg.norm(v2)
-                    if n1 > 1e-5 and n2 > 1e-5:
-                        cos_th = np.clip(np.dot(v1, v2) / (n1 * n2), -1.0, 1.0)
-                        if np.arccos(cos_th) > 1e-3: # Not strictly collinear
-                            simplified.append(c[j])
-                simplified.append(c[-1])
-                valid_curves[i] = np.array(simplified)
 
-            max_len = max(len(c) for c in valid_curves)
+            all_same_len = len(valid_curves) > 0 and all(len(c) == len(valid_curves[0]) for c in valid_curves)
+
+            if not all_same_len:
+                # Remove collinear points to preserve exact polygonal corners (essential for TE_Skin / Planks)
+                for i in range(len(valid_curves)):
+                    c = valid_curves[i]
+                    simplified = [c[0]]
+                    for j in range(1, len(c)-1):
+                        v1 = c[j] - simplified[-1]
+                        v2 = c[j+1] - c[j]
+                        n1 = np.linalg.norm(v1)
+                        n2 = np.linalg.norm(v2)
+                        if n1 > 1e-5 and n2 > 1e-5:
+                            cos_th = np.clip(np.dot(v1, v2) / (n1 * n2), -1.0, 1.0)
+                            if np.arccos(cos_th) > 1e-3: # Not strictly collinear
+                                simplified.append(c[j])
+                    simplified.append(c[-1])
+                    valid_curves[i] = np.array(simplified)
+
+                max_len = max(len(c) for c in valid_curves)
+                all_same_len = all(len(c) == max_len for c in valid_curves)
+            else:
+                max_len = len(valid_curves[0])
 
             def resample_closed(curve, n):
                 dist = np.cumsum(np.linalg.norm(np.diff(curve, axis=0), axis=1))
@@ -894,12 +1010,10 @@ class Wing3DExporter:
                     target[idx] = c_dist
                     
                 return np.array([np.interp(target, dist, curve[:, i]) for i in range(3)]).T
-                
-            all_same_len = all(len(c) == max_len for c in valid_curves)
             
             aligned_curves = []
             for i, c in enumerate(valid_curves):
-                if all_same_len and max_len <= 10:
+                if all_same_len:
                     c_res = c
                 else:
                     # Foam cutter uses a large target_count (>=100) to ensure corners aren't skipped.
@@ -909,7 +1023,7 @@ class Wing3DExporter:
                 if np.linalg.norm(c_res[0] - c_res[-1]) > 1e-5:
                     c_res = np.vstack([c_res, c_res[0]])
                     
-                if i > 0:
+                if i > 0 and not all_same_len:
                     prev_c = aligned_curves[-1]
                     
                     # Use centroid-based alignment to ignore global translation (e.g. from sweep/dihedral)

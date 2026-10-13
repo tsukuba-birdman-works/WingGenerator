@@ -15,7 +15,7 @@ DEFAULT_MATERIAL_PROPS = {
     'foam_skin_area_density': 50.0,   # g/m²   (溶融スキン)
 
     # 主桁（どちらかのモードで使用）
-    'main_spar_mode':         'weight',   # 'weight' or 'linear_density'
+    'main_spar_mode':         '固定重量',   # 'weight' or 'linear_density'
     'main_spar_weight_g':     0.0,        # g  （固定重量モード）
     'main_spar_linear_density': 100.0,   # g/m （線密度モード）
 
@@ -39,6 +39,9 @@ DEFAULT_MATERIAL_PROPS = {
     # OPPフィルム
     'film_area_density': 20.0,           # g/m²
 
+    # 後縁バルサ
+    'te_balsa_volume_density': 0.15,     # g/cm³ （バルサ材）
+
     # 両面テープ（3D非描画・解析的計算）
     'tape_linear_density': 5.0,          # g/m
 }
@@ -58,7 +61,9 @@ PART_CATEGORY = {
     'CarbonRibs':   'carbon_ribs',
     'TE_Cap_':      'te_cap',
     'Rib_Cap':      'rib_cap',
+    'TE_Balsa':     'te_balsa',
     'Film_Skin':    'film',
+    'JointSleeve_': 'joint_sleeve',
 }
 
 
@@ -192,19 +197,31 @@ class WeightCalculator:
         # Main Spar: 解析的計算
         main_spar_mode = mat_props.get('main_spar_mode', 'weight')
         if True:
-            if main_spar_mode == 'weight':
+            if main_spar_mode in ['weight', '固定重量']:
                 w = mat_props.get('main_spar_weight_g', 0.0)
                 results.append(_row('Main_Spar', 'main_spar', '主桁 (Main Spar)', f"{w:.2f} g", w, '固定重量'))
             else:
+                rho_lin = mat_props.get('main_spar_linear_density', 100.0)
                 span_m = extra_analytics.get('main_spar_span_mm', 0.0)/1000.0 if extra_analytics else 0.0
-                if span_m == 0 and 'main_spar' in category_data: span_m = category_data['main_spar']['bbox_span_m']
-                od = wing_params.get('main_spar_dia', 0.0)
-                t = wing_params.get('main_spar_thickness', 0.0)
-                if t <= 0: t = 1.0
-                id_ = max(0.0, od - 2*t)
-                area_cm2 = (np.pi/4) * (od**2 - id_**2) / 100.0
-                w = (span_m * 100.0) * area_cm2 * rho_ct
-                results.append(_row('Main_Spar', 'main_spar', '主桁 (Main Spar)', f"L={span_m*1000:.1f}mm, OD={od}mm", w, '解析的計算(円筒) × ρ'))
+                if span_m == 0 and 'main_spar' in category_data:
+                    span_m = category_data['main_spar']['bbox_span_m']
+                
+                js_span_m = 0.0
+                if 'joint_sleeve' in category_data:
+                    # Joint sleeves consists of Skin, Cap, Foam meshes. Summing them all double-counts the length.
+                    # We only take the length of the Skin meshes to get the exact structural length.
+                    for name, mp in mesh_props.items():
+                        if name.startswith('JointSleeve_Skin_'):
+                            js_span_m += mp.get('bbox_span_m', 0.0)
+                
+                total_span_m = span_m + js_span_m
+                w = total_span_m * rho_lin
+                
+                label_txt = f"L={total_span_m*1000:.1f}mm"
+                if js_span_m > 0:
+                    label_txt += f" (incl. joint {js_span_m*1000:.1f}mm)"
+                    
+                results.append(_row('Main_Spar', 'main_spar', '主桁 (Main Spar)', label_txt, w, '線密度 × L'))
 
         # Front Spar: 0g
         results.append(_row('Front_Spar', 'front_spar', '前桁 (Front Spar)',
@@ -249,7 +266,7 @@ class WeightCalculator:
             d = category_data['stringer']
             span_m = d.get('bbox_diag_m', d['bbox_span_m'])
             s_data = wing_params.get('stringers_data', [])
-            total_area_mm2 = sum(s.get('width', 0) * s.get('depth', 0) for s in s_data)
+            total_area_mm2 = sum(s.get('w', 0) * s.get('d', 0) for s in s_data)
             area_cm2 = total_area_mm2 / 100.0
             w = (span_m * 100.0) * area_cm2 * rho_str
             results.append(_row('Stringers', 'stringer', 'ストリンガー',
@@ -298,6 +315,15 @@ class WeightCalculator:
             results.append(_row('Film_Skin', 'film', 'OPPフィルム',
                                 f"A(外面)={outer_area*1e4:.1f}cm²",
                                 w, 'A × σ_film'))
+
+        # TE Balsa: 体積×体積密度
+        rho_balsa = mat_props.get('te_balsa_volume_density', 0.15)
+        if 'te_balsa' in category_data:
+            d = category_data['te_balsa']
+            w = d['volume_cm3'] * rho_balsa
+            results.append(_row('TE_Balsa', 'te_balsa', '後縁バルサ',
+                                f"V={d['volume_cm3']:.2f}cm³",
+                                w, 'V×ρ_balsa'))
 
         # --- 解析的計算（3Dなし）---
         # 両面テープ: (Σリブ周長 + 後縁長×3) × 線密度

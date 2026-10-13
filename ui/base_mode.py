@@ -136,7 +136,10 @@ class BaseRibGeneratorGUI:
         import json
         from tkinter import filedialog, messagebox
         path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")], title="Save Tool Config")
-        if not path: return
+        if not path:
+            return
+        if not os.path.splitext(path)[1]: path += '.json'
+        
         try:
             data = {
                 "cam_tool_dia": self.cam_tool_dia.get(),
@@ -203,7 +206,6 @@ class BaseRibGeneratorGUI:
         import tkinter as tk
         import json
         from tkinter import filedialog, messagebox
-        import os
 
         # --- Tab 1: Tabs & Supports ---
         f_tab_supports = ttk.Frame(notebook)

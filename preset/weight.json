@@ -1,0 +1,16 @@
+{
+    "foam_volume_density": 0.027,
+    "foam_skin_area_density": 27.0,
+    "main_spar_mode": "linear_density",
+    "main_spar_weight_g": 0.0,
+    "main_spar_linear_density": 100.0,
+    "carbon_tube_volume_density": 1.6,
+    "stringer_volume_density": 0.5,
+    "xbrace_linear_density": 1.5,
+    "carbon_rib_area_density": 200.0,
+    "carbon_rib_adhesive_density": 20.0,
+    "carbon_cap_area_density": 200.0,
+    "carbon_cap_adhesive_density": 20.0,
+    "film_area_density": 20.0,
+    "tape_linear_density": 5.0
+}

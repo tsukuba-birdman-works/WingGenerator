@@ -119,14 +119,15 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             'truss_angles_dict': getattr(self, 'truss_angles_dict', {}), 'stringers_data': getattr(self, 'get_stringers_data', lambda: [])(),
             'wing_type': getattr(self, 'wing_type', tk.StringVar(value="Linear")).get(),
             'wing_name': wing_name,
-            **{k: self.safe_float(getattr(self, k)) for k in ['joint_length', 'wing_span', 'chord_root', 'chord_tip', 'spar_pos_root', 'spar_pos_tip', 'washout_root', 'washout_tip', 'base_aoa', 'plank_start', 'plank_end', 'plank_thick', 'plank_part_start', 'plank_part_end', 'te_cut', 'beam_width', 'edge_beam_width', 'margin_spar', 'margin_bolt', 'margin_outer', 'margin_outer_edge', 'base_truss_angle', 'truss_fillet', 'min_hole_dia', 'xbrace_offset', 'rib_thick', 'cr_thick', 'te_cap_thick', 'rc1_start', 'rc1_end', 'rc1_thick', 'rc1_width', 'rc2_start', 'rc2_end', 'rc2_thick', 'rc2_width', 'le_interp_range', 'le_interp_divisions'] if hasattr(self, k)},
+            **{k: self.safe_float(getattr(self, k)) for k in ['joint_length', 'wing_span', 'chord_root', 'chord_tip', 'spar_pos_root', 'spar_pos_tip', 'washout_root', 'washout_tip', 'base_aoa', 'plank_start', 'plank_end', 'plank_thick', 'plank_part_start', 'plank_part_end', 'te_cut', 'beam_width', 'edge_beam_width', 'margin_spar', 'margin_bolt', 'margin_outer', 'margin_outer_edge', 'base_truss_angle', 'truss_fillet', 'min_hole_dia', 'xbrace_offset', 'rib_thick', 'cr_thick', 'te_cap_thick', 'rc1_start', 'rc1_end', 'rc1_thick', 'rc1_width', 'rc2_start', 'rc2_end', 'rc2_thick', 'rc2_width', 'te_balsa_start', 'te_balsa_end', 'te_balsa_thick', 'le_interp_range', 'le_interp_divisions'] if hasattr(self, k)},
             **{k: self.safe_float(getattr(self, k), default=None) for k in ['front_spar_dx', 'front_spar_dy', 'front_spar_dx_root', 'front_spar_dy_root', 'front_spar_dx_tip', 'front_spar_dy_tip', 'rear_spar_dx_root', 'rear_spar_dy_root', 'rear_spar_dx_tip', 'rear_spar_dy_tip', 'rear_spar_dx', 'rear_spar_dy'] if hasattr(self, k)},
             **{k: self.safe_float(getattr(self, k), default=-1.0) for k in ['spar_hole_dia', 'spar_hole_dv', 'front_spar_dia', 'rear_spar_dia', 'xbrace_dia', 'xbrace_wire_dia'] if hasattr(self, k)},
             **{k: self.safe_int(getattr(self, k)) for k in ['truss_front_n', 'truss_rear_n'] if hasattr(self, k)},
-            **{k: self.pm.vars[k].get() for k in ['safe_margin_var', 'truss_scale_front', 'truss_scale_rear', 'te_cap_uf_act', 'te_cap_lf_act', 'te_cap_ur_act', 'te_cap_lr_act', 'rc1_act', 'rc2_act', 'diag1_active', 'diag2_active', 'jig_y_positions', 'jig_base_height', 'jig_base_thickness', 'jig_wall_thickness', 'jig_pillar_angle', 'jig_te_stopper_height', 'jig_slot_interval', 'jig_slot_width', 'jig_slot_depth', 'dxf_layer_rib_outline', 'dxf_layer_holes', 'dxf_layer_truss', 'dxf_layer_plank', 'dxf_layer_te_part', 'dxf_layer_jig_outline', 'dxf_all_in_one', 'le_interp_active'] if k in self.pm.vars},
+            **{k: self.pm.vars[k].get() for k in ['safe_margin_var', 'truss_scale_front', 'truss_scale_rear', 'te_cap_uf_act', 'te_cap_lf_act', 'te_cap_ur_act', 'te_cap_lr_act', 'rc1_act', 'rc2_act', 'te_balsa_act', 'diag1_active', 'diag2_active', 'jig_y_positions', 'jig_base_height', 'jig_base_thickness', 'jig_wall_thickness', 'jig_pillar_angle', 'jig_te_stopper_height', 'jig_slot_interval', 'jig_slot_width', 'jig_slot_depth', 'dxf_layer_rib_outline', 'dxf_layer_holes', 'dxf_layer_truss', 'dxf_layer_plank', 'dxf_layer_te_part', 'dxf_layer_te_balsa', 'dxf_layer_jig_outline', 'dxf_all_in_one', 'le_interp_active', 'rear_spar_cutoff_act', 'cr_root_in_act', 'cr_root_out_act', 'cr_tip_in_act', 'cr_tip_out_act'] if k in self.pm.vars},
+            **{k: float(self.pm.vars[k].get()) for k in ['rear_spar_cutoff_start', 'rear_spar_main_conn'] if k in self.pm.vars and str(self.pm.vars[k].get()).replace('.', '', 1).isdigit()},
             'dxf_selections': {k: v.get() for k, v in getattr(self, 'dxf_selection_vars', {}).items()},
-            **{k: getattr(self, k).get() for k in ['export_main_spar', 'export_front_spar', 'export_rear_spar', 'export_plank', 'export_te', 'export_connectors', 'export_stringers', 'export_xbrace_wires', 'export_diag_spars', 'export_carbon_ribs', 'export_te_caps', 'export_rib_caps', 'export_film', 'export_joint_sleeves'] if hasattr(self, k)},
-            **{f'mat_{k}': getattr(self, f'mat_{k}').get() for k in ['ribs', 'main_spar', 'front_spar', 'rear_spar', 'plank', 'te', 'connectors', 'stringers', 'xbrace_wires', 'diag_spars', 'carbon_ribs', 'te_caps', 'rib_caps', 'film', 'js_cap', 'js_foam', 'js_skin'] if hasattr(self, f'mat_{k}')},
+            **{k: getattr(self, k).get() for k in ['export_main_spar', 'export_front_spar', 'export_rear_spar', 'export_plank', 'export_te', 'export_connectors', 'export_stringers', 'export_xbrace_wires', 'export_diag_spars', 'export_carbon_ribs', 'export_te_caps', 'export_rib_caps', 'export_te_balsa', 'export_film', 'export_joint_sleeves'] if hasattr(self, k)},
+            **{f'mat_{k}': getattr(self, f'mat_{k}').get() for k in ['ribs', 'main_spar', 'front_spar', 'rear_spar', 'plank', 'te', 'connectors', 'stringers', 'xbrace_wires', 'diag_spars', 'carbon_ribs', 'te_caps', 'rib_caps', 'te_balsa', 'film', 'js_cap', 'js_foam', 'js_skin'] if hasattr(self, f'mat_{k}')},
             'main_spar_inner_dia': self.safe_float(self.main_spar_inner_dia),
             'front_spar_inner_dia': self.safe_float(self.front_spar_inner_dia),
             'rear_spar_inner_dia': self.safe_float(self.rear_spar_inner_dia),
@@ -651,10 +652,10 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
                 chord, spar_pct, washout, blend, local_xb_pct, x_dia = self.get_local_params(y_local)
                 angle = p['truss_angles_dict'].get(idx, p['base_truss_angle'])
                 title = f"{item['label']} - Chord: {chord:.1f}mm, Washout: {washout:.2f}°, Truss: {angle:.1f}°" + (" [FAST PREVIEW]" if fast_mode else "")
-                self.draw_plot(*res[:12], self.last_warnings, res.plank_poly_rot, res.te_part_coords, res.c_b1, res.hole_b1, res.c_b2, res.hole_b2, res.diag_poly_pts_list, res.final_rib_orig, title, res.te_cap_pts_list, res.rc_cap_pts_list)
+                self.draw_plot(*res[:12], self.last_warnings, res.plank_poly_rot, res.te_part_coords, res.c_b1, res.hole_b1, res.c_b2, res.hole_b2, res.diag_poly_pts_list, res.final_rib_orig, title, res.te_cap_pts_list, res.rc_cap_pts_list, te_balsa_pts=res.te_balsa_pts, te_balsa_holes=getattr(res, 'te_balsa_holes', None))
         except Exception as e: print("Preview Error:", e)
 
-    def draw_plot(self, rib_pts, c_m, h_m, c_r, h_r, c_f, h_f, t_holes, xb_act, xb_c_act, xb_skip, xb_c_skip, warnings_list, plank_poly, te_part, c_b1, hole_b1, c_b2, hole_b2, diag_poly_pts_list, final_rib_orig, title, te_cap_pts_list=None, rc_cap_pts_list=None, jig_pts=None, jig_wing_pts=None):
+    def draw_plot(self, rib_pts, c_m, h_m, c_r, h_r, c_f, h_f, t_holes, xb_act, xb_c_act, xb_skip, xb_c_skip, warnings_list, plank_poly, te_part, c_b1, hole_b1, c_b2, hole_b2, diag_poly_pts_list, final_rib_orig, title, te_cap_pts_list=None, rc_cap_pts_list=None, jig_pts=None, jig_wing_pts=None, te_balsa_pts=None, te_balsa_holes=None):
         self.ax.clear(); self.ax.grid(True, linestyle='--', alpha=0.7); self.ax.set_aspect('equal', adjustable='datalim')
         if len(rib_pts) > 0:
             self.ax.plot(rib_pts[:, 0], rib_pts[:, 1], 'b-', linewidth=2, label="Rib Shape")
@@ -662,9 +663,9 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             le = final_rib_orig[np.argmin(final_rib_orig[:, 0])]
             te = final_rib_orig[0]
             self.ax.plot([le[0], te[0]], [le[1], te[1]], 'k-.', linewidth=0.8, alpha=0.5, label="Chord Line")
-        if self.safe_float(self.spar_hole_dia) > 0: self.ax.plot(c_m[0], c_m[1], 'kx', markersize=6); self.ax.plot(h_m[:, 0], h_m[:, 1], 'r-', linewidth=1.5)
-        if self.safe_float(self.front_spar_dia) > 0: self.ax.plot(c_f[0], c_f[1], 'cx', markersize=6); self.ax.plot(h_f[:, 0], h_f[:, 1], 'c-', linewidth=1.5)
-        if self.safe_float(self.rear_spar_dia) > 0: self.ax.plot(c_r[0], c_r[1], 'mx', markersize=6); self.ax.plot(h_r[:, 0], h_r[:, 1], 'm-', linewidth=1.5)
+        if self.safe_float(self.spar_hole_dia) > 0 and len(h_m) > 0: self.ax.plot(c_m[0], c_m[1], 'kx', markersize=6); self.ax.plot(h_m[:, 0], h_m[:, 1], 'r-', linewidth=1.5)
+        if self.safe_float(self.front_spar_dia) > 0 and len(h_f) > 0: self.ax.plot(c_f[0], c_f[1], 'cx', markersize=6); self.ax.plot(h_f[:, 0], h_f[:, 1], 'c-', linewidth=1.5)
+        if self.safe_float(self.rear_spar_dia) > 0 and len(h_r) > 0: self.ax.plot(c_r[0], c_r[1], 'mx', markersize=6); self.ax.plot(h_r[:, 0], h_r[:, 1], 'm-', linewidth=1.5)
         if len(hole_b1) > 0: self.ax.plot(c_b1[0], c_b1[1], 'kx', markersize=4); self.ax.plot(hole_b1[:, 0], hole_b1[:, 1], 'r-', linewidth=1.5)
         if len(hole_b2) > 0: self.ax.plot(c_b2[0], c_b2[1], 'kx', markersize=4); self.ax.plot(hole_b2[:, 0], hole_b2[:, 1], 'r-', linewidth=1.5)
         for h in t_holes: self.ax.plot(h[:, 0], h[:, 1], color='orange', linestyle='-', linewidth=1.5)
@@ -687,6 +688,12 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
                 if len(cap_pts) > 0:
                     self.ax.plot(cap_pts[:, 0], cap_pts[:, 1], color='darkgreen', linestyle='-', linewidth=2, label="Rib Cap" if not drawn_rc_cap else "")
                     drawn_rc_cap = True
+        if te_balsa_pts is not None and len(te_balsa_pts) > 0:
+            self.ax.plot(te_balsa_pts[:, 0], te_balsa_pts[:, 1], color='saddlebrown', linestyle='-', linewidth=1.5, label="TE Balsa")
+        if te_balsa_holes is not None:
+            for bh in te_balsa_holes:
+                if len(bh) > 0:
+                    self.ax.plot(bh[:, 0], bh[:, 1], color='saddlebrown', linestyle='--', linewidth=1.2)
         # Jig preview: draw wing reference shape faintly, then jig outline prominently
         if jig_wing_pts is not None and len(jig_wing_pts) > 0:
             self.ax.plot(jig_wing_pts[:, 0], jig_wing_pts[:, 1], color='steelblue', linestyle='--', linewidth=1.2, alpha=0.5, label="Wing Shape (ref)")
@@ -753,6 +760,7 @@ class RibGeneratorGUI_Batch(BaseRibGeneratorGUI):
             filetypes=[("glTF Binary", "*.glb"), ("Wavefront OBJ", "*.obj")]
         )
         if not filepath: return
+        if not os.path.splitext(filepath)[1]: filepath += '.glb'
         
         try:
             import trimesh

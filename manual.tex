@@ -17,7 +17,7 @@
 \newpage
 
 \section{はじめに}
-本ソフトウェア「WingGenerator」は、人力飛行機やUAV向けの翼二次構造（リブ・トラスなど）および加工・治具用データを生成するツール群です。
+本ソフトウェア「WingGenerator」は、人力飛行機やUAV向けの翼二次構造（リブ・トラスなど）および加工・治具用データを生成する統合設計ツール群です。
 
 \section{機能概要}
 本ツールには以下の主要な機能が含まれています。
@@ -29,49 +29,85 @@
     \item \textbf{Weight Calculator (重量計算):} 各部材の材質・密度から、リブ全体の重量を算出します。
 \end{itemize}
 
-\section{使用方法}
+\section{使用方法とパラメータ詳解}
+
 \subsection{起動}
 コマンドプロンプトやターミナルで以下のコマンドを実行し、ランチャーを起動します。
 \begin{lstlisting}[language=bash, frame=single]
 python main.py
 \end{lstlisting}
 
-\subsection{Batch Wing Mode の使い方}
-\begin{enumerate}
-    \item \textbf{レイアウト設定:} 「翼全体」タブで翼長（Span）、リブ間隔（Rib Interval）を入力します。翼根（Root）と翼端（Tip）の翼型データ（DAT形式など）、翼弦長（Chord）、主桁位置、ねじり下げ（Washout）を設定します。
-    \item \textbf{リブ設定:} 「リブ」タブで、主桁・後桁用の穴径、肉抜き穴（トラス）の数とマージン、トラス個別縮小率などを設定します。
-    \item \textbf{プレビュー:} 画面右側のプレビューウィンドウおよびスライダーを用いて、各リブの形状変化をリアルタイムで確認します。
-    \item \textbf{エクスポート:} 設定完了後、「Export GLB \& DXF」ボタンをクリックすると、チェックボックスで指定した項目の3Dモデル（GLB）および2D図面（DXF）が出力されます。
-\end{enumerate}
+\subsection{Batch Wing Mode (一括生成モード)}
+翼の寸法や翼型を指定することで、すべてのリブを一気に設計・プレビューできるメイン機能です。
 
-\subsection{FEA解析の使い方}
-構造の強度確認を行うための機能です。実行には CalculiX (ccxコマンド) がインストールされ、PATHが通っている必要があります。
-\begin{enumerate}
-    \item Batch Mode等のプレビュー画面から「FEA Analysis」ボタンをクリックします。
-    \item スパン方向の揚力分布が記述されたCSVファイル（\texttt{Y(span), Lift(N)} の2カラム形式）を選択します。
-    \item リブの材質（ヤング率、ポアソン比）、プランク（前縁スキン）の有無や材質、許容応力（Allowable Stress）などを入力します。
-    \item 「Run Analysis」を実行すると、メッシュ生成と解析が行われ、キャンバスに応力分布（Von Mises応力）と変形量が表示されます。
-    \item スパー（桁）接着部には、局所的な接着反力が矢印（Show RF ArrowsがONの場合）、またはカラードット（OFFの場合）で表示され、テキストボックスには接着面積から求めた平均せん断応力が出力されます。許容応力を超えた場合は赤い×マークが点滅します。
-\end{enumerate}
+\subsubsection{Wing Layout (翼全体レイアウト)}
+\begin{itemize}
+    \item \textbf{Wing Span (mm):} 翼の片側のスパン長（半スパン）を指定します。
+    \item \textbf{Rib Interval (mm):} リブを配置する間隔を指定します。
+    \item \textbf{Washout (deg):} ねじり下げ角度です。翼根から翼端にかけて、この角度分だけピッチが下がります。
+\end{itemize}
 
-\subsection{4-Axis Foam CAM の使い方}
-ランチャーから起動し、熱線カッター（Hot Wire CNC）を制御するためのGコードを生成します。
-\begin{enumerate}
-    \item ルート側とチップ側の翼型ファイルを読み込みます。
-    \item 翼弦長（Chord）、機械の有効長、熱線による溶け幅（Kerf）などを入力します。
-    \item アプローチ（進入経路）やタブ（切り落とさずに残す部分）の設定を行います。
-    \item 「Generate G-code」で加工データが出力されます。
-\end{enumerate}
+\subsubsection{Airfoil \& Chord (翼型・弦長)}
+\begin{itemize}
+    \item \textbf{Root / Tip Airfoil:} 翼根および翼端の翼型データ（.dat形式）を選択します。UI上でブレンド率（Blend）を指定することで、翼根から翼端にかけて滑らかに翼型を遷移させることができます。
+    \item \textbf{Root / Tip Chord (mm):} 翼根および翼端の翼弦長（コード長）です。
+\end{itemize}
 
-\subsection{Wingtip Fin Gen の使い方}
-翼端に取り付けるフィン（ウイングレット等）の平面形や翼型推移を設定・設計し、DXFやGLBデータとして出力します。
+\subsubsection{Spars (桁設定)}
+\begin{itemize}
+    \item \textbf{Main Spar Pct (\%):} 主桁の配置位置を翼弦長に対するパーセンテージで指定します（例：30\% であれば前縁から30\%の位置）。
+    \item \textbf{Main Spar Dia / dv (mm):} 主桁を通す穴の寸法（直径および垂直方向の長さ）です。
+    \item \textbf{Front / Rear Spar Dia (mm):} 前桁・後桁の直径です。使用しない場合は \texttt{0} に設定します。
+    \item \textbf{Bolt Holes:} 桁を接合するためのボルト穴です。主桁中心からの相対座標（X, Z）と直径を指定します。
+\end{itemize}
+
+\subsubsection{Rib Structure (リブ構造)}
+\begin{itemize}
+    \item \textbf{Rib Thickness (mm):} リブの厚み（通常のリブの素材厚み）を指定します。
+    \item \textbf{Carbon Rib Thick (mm):} 補強用カーボンリブの厚みです。
+    \item \textbf{Outer Margin (mm):} リブの外形線からトラス（肉抜き穴）までの余白幅です。
+    \item \textbf{Inner Margin (mm):} 桁穴などの周囲に残す余白幅です。
+    \item \textbf{Truss Count:} リブ内部をくり抜くトラス（肉抜き）の分割数です。
+    \item \textbf{Min Hole Dia (mm):} トラス穴の最小許容直径です。これより小さくなる穴は生成されません。
+\end{itemize}
+
+\subsubsection{プレビューと警告機能}
+画面右側の「Rib Preview」エリアには、選択したリブの断面形状が表示されます。
+\textbf{警告機能：} 翼端に向かって翼弦長が細くなり、主桁穴などの穴がリブの外形線（表面）をはみ出す・交差してしまうような場合は、プレビュー画面上部に赤色の警告ラベル（例：\texttt{WARNING: Main Spar intersects rib boundary!}）が表示されます。
+
+\subsection{FEA Analysis (有限要素解析)}
+リブ単体の強度をシミュレーションする機能です。CalculiX (ccxコマンド) を利用します。
+\begin{itemize}
+    \item \textbf{Lift Dist CSV:} スパン方向の揚力分布データ（Y座標, 揚力N）を読み込みます。flow5等の空力解析結果を利用できます。
+    \item \textbf{Allowable Stress (MPa):} リブ素材の許容応力です。これを超えるとUI上で警告（赤い×マーク）が表示されます。
+    \item \textbf{Plank (前縁スキン):} プランク材が接着されている場合、その剛性を解析に組み込むことができます。
+    \item \textbf{Show RF Arrows:} 桁とリブの接着面に生じる反力（Reaction Force）を矢印ベクトルで可視化するかどうかを切り替えます。
+\end{itemize}
+
+\subsection{Wingtip Fin Gen (翼端フィン設計)}
+空力解析（flow5等）および製造用の翼端フィンモデルを設計します。
+\begin{itemize}
+    \item \textbf{Fin Style:} フィンの形状スタイル（Winglet, Horner, Round Dome, Flat）を選択します。
+    \item \textbf{Height/Span (mm):} フィンの高さです。
+    \item \textbf{Sweep/Offset (mm):} フィン先端の後退量（オフセット）です。
+    \item \textbf{Cant Angle (deg):} フィンの傾斜角（カント角）です。
+    \item \textbf{Aerodynamic Export:} 画面上の「Export to flow5 (TXT)」ボタンを押すと、flow5に直接インポートできる空力解析用のジオメトリテキストが出力されます。
+\end{itemize}
+
+\subsection{4-Axis Foam CAM (フォームコア加工)}
+\begin{itemize}
+    \item \textbf{Wire Kerf (mm):} 熱線で溶ける幅（カーフ）です。この分だけ軌道が外側にオフセットされます。
+    \item \textbf{Tower Distance (mm):} 左右の熱線タワー（ステッピングモーター）間の物理的な距離です。
+    \item \textbf{Entry/Exit Strategy:} フォームブロックの外側から熱線が進入・退出する経路の設定です。
+\end{itemize}
 
 \subsection{Weight Calculator (重量計算)}
-設計したリブの体積から、予想される重量を算出します。
-\begin{enumerate}
-    \item Batch Mode等で設計後、「Weight Calc」ボタンをクリックします。
-    \item 各部品（リブ本体、プランク材、カーボン補強等）の密度（Density）や厚みを入力します。
-    \item 即座に全体の推定重量が更新され、機体全体の重量見積もりに活用できます。
-\end{enumerate}
+設計データのバウンディングボックス対角線長（3D寸法）やメッシュ体積から、各部品の重量を算出します。
+\begin{itemize}
+    \item \textbf{Foam Density (g/cm³):} フォーム材の体積密度。
+    \item \textbf{Skin Density (g/m²):} 熱線カット時に表面に形成される溶融硬化スキン層の面密度。
+    \item \textbf{Carbon Tube Density (g/cm³):} 桁に使用するカーボンパイプ等の密度。
+\end{itemize}
+\textit{※ストリンガーや斜めスパーなども、テーパー角や後退角を考慮した3次元空間上の正確な長さで計算されます。}
 
 \end{document}

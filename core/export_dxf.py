@@ -22,6 +22,7 @@ class WingDXFExporter:
             'dxf_layer_truss': self.p.get('dxf_layer_truss', True),
             'dxf_layer_plank': self.p.get('dxf_layer_plank', True),
             'dxf_layer_te_part': self.p.get('dxf_layer_te_part', True),
+            'dxf_layer_te_balsa': self.p.get('dxf_layer_te_balsa', True),
             'dxf_layer_jig_outline': self.p.get('dxf_layer_jig_outline', True)
         }
         selections = self.p.get('dxf_selections', {})
@@ -158,9 +159,12 @@ class WingDXFExporter:
         return self.engine.generate_rib_at_y(p_copy, y_local, rib_index, thickness, is_carbon, te_cut_override)
 
     def _export_single_dxf(self, filepath, res, jig_pts=None, doc=None, msp=None, offset=(0,0), layer_flags=None):
+        te_balsa_pts = getattr(res, 'te_balsa_pts', None)
+        te_balsa_holes = getattr(res, 'te_balsa_holes', None)
         self.engine.export_dxf(filepath, res[1], res[0], res[1], self.p['spar_hole_dia'], 
                                res[5], self.p['front_spar_dia'], res[3], self.p['rear_spar_dia'], 
                                res[7], res[9], self.p['xbrace_dia'], res[13], res[14], 
                                res[15], self.p['root_bolt1'][2], res[16], 
                                res[17], self.p['root_bolt2'][2], res[18], res[19], res[22], res[23], 
-                               jig_pts=jig_pts, doc=doc, msp=msp, offset=offset, layer_flags=layer_flags)
+                               jig_pts=jig_pts, doc=doc, msp=msp, offset=offset, layer_flags=layer_flags,
+                               te_balsa_pts=te_balsa_pts, te_balsa_holes=te_balsa_holes)

@@ -368,6 +368,7 @@ class FoamCutterGUI:
 
         save_path = filedialog.asksaveasfilename(defaultextension=".nc", filetypes=[("G-Code", "*.nc *.gcode")])
         if save_path:
+            if not os.path.splitext(save_path)[1]: save_path += ".nc"
             with open(save_path, 'w') as f:
                 f.write(gcode_str)
             messagebox.showinfo("Success", f"Saved to:\n{save_path}")

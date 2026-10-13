@@ -376,6 +376,7 @@ class WingtipFinGUI:
         )
         if not filepath:
             return
+        if not os.path.splitext(filepath)[1]: filepath += f".{file_type}"
             
         try:
             params = self.get_ui_params()
@@ -410,6 +411,7 @@ class WingtipFinGUI:
             )
             if not filepath:
                 return
+            if not os.path.splitext(filepath)[1]: filepath += ".txt"
                 
             with open(filepath, 'w') as f:
                 f.write("Wingtip_Fin\n")

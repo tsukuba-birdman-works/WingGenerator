@@ -1,3 +1,4 @@
+import os
 import json
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -11,6 +12,7 @@ class ConfigHelper:
     def save_config(app, mode_name):
         path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")], title=f"Save {mode_name} Config")
         if not path: return
+        if not os.path.splitext(path)[1]: path += ".json"
         
         try:
             # 1. Collect all variables
